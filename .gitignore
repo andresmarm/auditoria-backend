@@ -1,0 +1,17 @@
+# Entorno
+.env
+*.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Docker
+*.log
+
+# Python
+dist/
+build/
+*.egg-info/
+.pytest_cache/

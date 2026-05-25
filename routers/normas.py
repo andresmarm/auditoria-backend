@@ -34,8 +34,7 @@ async def cargar_norma(
         entidad_emisora=data.entidad_emisora,
         fecha_expedicion=data.fecha_expedicion,
         fecha_vigencia=data.fecha_vigencia,
-        url_fuente=data.url_fuente,
-        vigente=True
+        url_fuente=data.url_fuente
     )
     db.add(norma)
     db.commit()

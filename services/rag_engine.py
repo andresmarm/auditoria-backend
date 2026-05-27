@@ -1,165 +1,183 @@
-import anthropic
+"""
+RAG ENGINE
+==========
+Búsqueda semántica en pgvector + prompt enriquecido + Claude con streaming.
+
+Esquema real usado:
+  normas:       id, codigo, nombre, tipo, entidad_emisora, fecha_vigencia, vigente
+  chunks_normas: id, norma_id, articulo, titulo, contenido, embedding, vigente
+"""
+
+import os
+from typing import AsyncGenerator
 from openai import OpenAI
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from typing import Optional, AsyncIterator
-from core.config import settings
-from core.database import SessionLocal
+from anthropic import Anthropic
+from supabase import create_client, Client
 
-PROMPT_SISTEMA = """Eres un experto en auditoría del sector público colombiano con profundo conocimiento 
-en control interno, gestión de riesgos y normatividad vigente. Tu función es generar planes de auditoría 
-profesionales, detallados y alineados con el marco normativo colombiano.
+# ── Clientes ──────────────────────────────────────────────
+supabase: Client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_SERVICE_KEY")
+)
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+claude_client  = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-INSTRUCCIONES CRÍTICAS:
-1. Basa ÚNICAMENTE tu respuesta en los documentos del proceso y la normatividad proporcionada.
-2. Cita siempre la norma exacta (ley, artículo, decreto) que fundamenta cada criterio de auditoría.
-3. Si se proporcionó una matriz de riesgos, úsala para definir los riesgos a verificar.
-4. Si se proporcionó un formato institucional, respeta su estructura exactamente.
-5. Si no se proporcionó formato, usa la estructura estándar de auditoría interna colombiana.
-6. Nunca inventes normatividad. Si no encuentras una norma aplicable en el contexto, indícalo.
-7. El plan debe ser accionable, con actividades concretas y verificables."""
+EMBEDDING_MODEL = "text-embedding-3-small"
+CLAUDE_MODEL    = "claude-sonnet-4-20250514"
+TOP_K           = 6
+MAX_TOKENS      = 2048
 
-PROMPT_PLAN = """
-=== NORMATIVIDAD APLICABLE (recuperada del sistema) ===
-{chunks_normativos}
+# ── System prompt ─────────────────────────────────────────
+SYSTEM_PROMPT = """Eres un asistente especializado en normatividad colombiana para el sector público.
+Respondes preguntas de funcionarios públicos con base EXCLUSIVAMENTE en los fragmentos normativos
+que se te proporcionan como contexto.
 
-=== DOCUMENTO DEL PROCESO A AUDITAR ===
-{texto_proceso}
+REGLAS:
+- Cita siempre la fuente: código de la norma, nombre y artículo cuando estén disponibles
+- Si la respuesta no está en el contexto, dilo claramente: "Esta información no se encuentra
+  en la normatividad cargada en el sistema"
+- Nunca inventes normas, artículos ni fechas
+- Usa lenguaje claro y accesible para funcionarios públicos
+- Si una norma tiene fecha de vigencia próxima a vencer o ya venció, adviértelo
+- Organiza la respuesta con secciones claras cuando haya múltiples aspectos
 
-{seccion_matriz}
+Responde siempre en español."""
 
-{seccion_formato}
 
-=== INSTRUCCIÓN ===
-Genera un plan de auditoría completo para el proceso descrito. El plan debe incluir:
+# ── Paso 1: Vectorizar la pregunta ────────────────────────
 
-1. **OBJETIVO DE LA AUDITORÍA**
-   - Objetivo general
-   - Objetivos específicos
+def vectorizar_consulta(pregunta: str) -> list[float]:
+    response = openai_client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=pregunta
+    )
+    return response.data[0].embedding
 
-2. **ALCANCE**
-   - Procesos y actividades a auditar
-   - Dependencias involucradas
-   - Período a auditar
 
-3. **CRITERIOS DE AUDITORÍA**
-   - Lista de normas aplicables con artículo exacto y texto relevante
-   - Estándares técnicos aplicables
+# ── Paso 2: Buscar chunks en pgvector ────────────────────
 
-4. **RIESGOS A VERIFICAR**
-   - Lista de riesgos identificados (de la matriz si fue proporcionada)
-   - Nivel de riesgo y controles esperados
+def buscar_chunks_relevantes(vector: list[float], top_k: int = TOP_K) -> list[dict]:
+    resultado = supabase.rpc(
+        "buscar_normas",
+        {"query_embedding": vector, "match_count": top_k}
+    ).execute()
+    return resultado.data or []
 
-5. **PROGRAMA DE AUDITORÍA**
-   - Tabla de actividades con: Actividad | Responsable | Técnica | Evidencia esperada | Tiempo estimado
 
-6. **LISTA DE VERIFICACIÓN**
-   - Preguntas específicas por cada actividad del proceso
-   - Basadas en la normatividad citada
+# ── Paso 3: Construir prompt con contexto ─────────────────
 
-7. **RECURSOS Y CRONOGRAMA**
-   - Equipo auditor recomendado
-   - Duración estimada
-
-Fundamenta cada sección en la normatividad proporcionada. Cita artículos específicos.
-"""
-
-class RAGEngine:
-    def __init__(self):
-        self.anthropic = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        self.openai = OpenAI(api_key=settings.openai_api_key)
-
-    def vectorizar_texto(self, texto: str) -> list[float]:
-        """Convierte texto en vector de embeddings."""
-        response = self.openai.embeddings.create(
-            input=texto[:8000],  # Límite de tokens
-            model="text-embedding-3-small"
-        )
-        return response.data[0].embedding
-
-    def buscar_chunks(self, query: str, top_k: int = 8) -> list[dict]:
-        """Busca los fragmentos normativos más relevantes por similitud semántica."""
-        embedding = self.vectorizar_texto(query)
-        embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-
-        db = SessionLocal()
-        try:
-            resultado = db.execute(text("""
-                SELECT 
-                    cn.id,
-                    cn.articulo,
-                    cn.titulo,
-                    cn.contenido,
-                    n.nombre AS norma_nombre,
-                    n.codigo AS norma_codigo,
-                    n.tipo AS norma_tipo,
-                    1 - (cn.embedding <=> :embedding::vector) AS similitud
-                FROM chunks_normas cn
-                JOIN normas n ON cn.norma_id = n.id
-                WHERE cn.vigente = true AND n.vigente = true
-                ORDER BY cn.embedding <=> :embedding::vector
-                LIMIT :top_k
-            """), {"embedding": embedding_str, "top_k": top_k})
-
-            return [dict(row._mapping) for row in resultado]
-        finally:
-            db.close()
-
-    def formatear_chunks(self, chunks: list[dict]) -> str:
-        """Formatea los chunks para incluirlos en el prompt."""
-        if not chunks:
-            return "No se encontraron normas específicas. Aplica el marco general de control interno colombiano."
-
+def construir_prompt(pregunta: str, chunks: list[dict]) -> str:
+    if not chunks:
+        contexto = "No se encontraron fragmentos normativos relacionados con esta consulta."
+    else:
         partes = []
-        for chunk in chunks:
-            partes.append(
-                f"[{chunk['norma_codigo']} - {chunk['norma_nombre']}]\n"
-                f"{chunk['articulo'] or ''}: {chunk['titulo'] or ''}\n"
-                f"{chunk['contenido']}\n"
-            )
-        return "\n---\n".join(partes)
+        for i, chunk in enumerate(chunks, 1):
+            # Encabezado con toda la info disponible de la norma
+            codigo   = chunk.get("codigo_norma") or ""
+            nombre   = chunk.get("titulo_norma") or "Norma desconocida"
+            tipo     = chunk.get("tipo_norma") or ""
+            entidad  = chunk.get("entidad_emisora") or ""
+            vigencia = chunk.get("fecha_vigencia") or ""
+            articulo = chunk.get("articulo") or ""
+            similitud = chunk.get("similitud", 0)
 
-    async def generar_plan_stream(
-        self,
-        texto_proceso: str,
-        texto_matriz: Optional[str],
-        texto_formato: Optional[str],
-        nombre_proceso: Optional[str]
-    ) -> AsyncIterator[str]:
-        """Genera el plan de auditoría en streaming usando RAG + Claude."""
+            encabezado_partes = [f"Fragmento {i}"]
+            if codigo:
+                encabezado_partes.append(codigo)
+            encabezado_partes.append(nombre)
+            if tipo:
+                encabezado_partes.append(tipo)
+            if entidad:
+                encabezado_partes.append(f"Emisor: {entidad}")
+            if vigencia:
+                encabezado_partes.append(f"Vigente desde: {vigencia}")
+            if articulo:
+                encabezado_partes.append(articulo)
+            encabezado_partes.append(f"Relevancia: {similitud:.0%}")
 
-        # 1. Buscar chunks normativos relevantes
-        query_busqueda = f"{nombre_proceso or ''} {texto_proceso[:2000]}"
-        chunks = self.buscar_chunks(query_busqueda, top_k=8)
-        chunks_texto = self.formatear_chunks(chunks)
+            encabezado = " | ".join(encabezado_partes)
+            partes.append(f"[{encabezado}]\n{chunk.get('contenido', '')}\n")
 
-        # 2. Construir secciones opcionales
-        seccion_matriz = ""
-        if texto_matriz:
-            seccion_matriz = f"""=== MATRIZ DE RIESGOS PROPORCIONADA ===
-{texto_matriz[:3000]}
-"""
+        contexto = "\n---\n".join(partes)
 
-        seccion_formato = ""
-        if texto_formato:
-            seccion_formato = f"""=== FORMATO INSTITUCIONAL DEL PLAN (respetar esta estructura) ===
-{texto_formato[:2000]}
-"""
+    return f"""CONTEXTO NORMATIVO RECUPERADO DEL SISTEMA:
+{contexto}
 
-        # 3. Construir prompt completo
-        prompt = PROMPT_PLAN.format(
-            chunks_normativos=chunks_texto,
-            texto_proceso=texto_proceso[:4000],
-            seccion_matriz=seccion_matriz,
-            seccion_formato=seccion_formato
-        )
+---
 
-        # 4. Llamar a Claude en streaming
-        with self.anthropic.messages.stream(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=PROMPT_SISTEMA,
-            messages=[{"role": "user", "content": prompt}]
-        ) as stream:
-            for text_chunk in stream.text_stream:
-                yield text_chunk
+PREGUNTA DEL FUNCIONARIO:
+{pregunta}
+
+INSTRUCCIÓN: Responde basándote únicamente en el contexto normativo anterior.
+Cita los fragmentos relevantes indicando su fuente (código y artículo cuando estén disponibles)."""
+
+
+# ── Paso 4: Claude con streaming ─────────────────────────
+
+async def consultar_claude_streaming(
+    pregunta: str,
+    historial: list[dict] | None = None
+) -> AsyncGenerator[str, None]:
+    """Yields tokens en tiempo real para SSE."""
+    vector = vectorizar_consulta(pregunta)
+    chunks = buscar_chunks_relevantes(vector)
+    prompt = construir_prompt(pregunta, chunks)
+
+    mensajes = (historial or []) + [{"role": "user", "content": prompt}]
+
+    with claude_client.messages.stream(
+        model=CLAUDE_MODEL,
+        max_tokens=MAX_TOKENS,
+        system=SYSTEM_PROMPT,
+        messages=mensajes
+    ) as stream:
+        for text in stream.text_stream:
+            yield text
+
+    # Emitir fuentes al final
+    if chunks:
+        fuentes = []
+        vistos = set()
+        for c in chunks:
+            key = c.get("codigo_norma") or c.get("titulo_norma", "")
+            if key and key not in vistos:
+                vistos.add(key)
+                fuentes.append(key)
+        if fuentes:
+            yield f"\n\n---\n**Fuentes consultadas:** {', '.join(fuentes)}"
+
+
+# ── Versión síncrona (testing / endpoints simples) ────────
+
+def consultar_claude_sync(
+    pregunta: str,
+    historial: list[dict] | None = None
+) -> dict:
+    vector = vectorizar_consulta(pregunta)
+    chunks = buscar_chunks_relevantes(vector)
+    prompt = construir_prompt(pregunta, chunks)
+
+    mensajes = (historial or []) + [{"role": "user", "content": prompt}]
+
+    response = claude_client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=MAX_TOKENS,
+        system=SYSTEM_PROMPT,
+        messages=mensajes
+    )
+
+    fuentes = []
+    vistos = set()
+    for c in chunks:
+        key = c.get("codigo_norma") or c.get("titulo_norma", "")
+        if key and key not in vistos:
+            vistos.add(key)
+            fuentes.append(key)
+
+    return {
+        "respuesta": response.content[0].text,
+        "fuentes": fuentes,
+        "chunks_usados": len(chunks),
+        "tokens_entrada": response.usage.input_tokens,
+        "tokens_salida": response.usage.output_tokens
+    }

@@ -2,14 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.openapi.utils import get_openapi
-from routers import auth, sesiones, planes, normas
-from routers import asistente
-from routers import planes
-
-
-app.include_router(planes.router, prefix="/api/v1/planes", tags=["Planes"])
-  
-app.include_router(asistente.router, prefix="/api/v1/asistente", tags=["Asistente IA"])
+from routers import auth, sesiones, planes, normas, asistente
 
 app = FastAPI(
     title="Asistente de Auditoría - API",
@@ -25,10 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router,     prefix="/api/v1/auth",     tags=["Autenticación"])
-app.include_router(sesiones.router, prefix="/api/v1/sesiones", tags=["Sesiones"])
-app.include_router(planes.router,   prefix="/api/v1/planes",   tags=["Planes"])
-app.include_router(normas.router,   prefix="/api/v1/normas",   tags=["Normas"])
+app.include_router(auth.router,      prefix="/api/v1/auth",      tags=["Autenticación"])
+app.include_router(sesiones.router,  prefix="/api/v1/sesiones",  tags=["Sesiones"])
+app.include_router(planes.router,    prefix="/api/v1/planes",    tags=["Planes"])
+app.include_router(normas.router,    prefix="/api/v1/normas",    tags=["Normas"])
+app.include_router(asistente.router, prefix="/api/v1/asistente", tags=["Asistente IA"])
 
 @app.get("/")
 def root():
@@ -47,14 +41,12 @@ def custom_openapi():
         description=app.description,
         routes=app.routes,
     )
-    # Registrar HTTPBearer en el esquema OpenAPI
     schema["components"]["securitySchemes"] = {
         "HTTPBearer": {
             "type": "http",
             "scheme": "bearer",
         }
     }
-    # Aplicar seguridad a todos los endpoints
     for path in schema["paths"].values():
         for method in path.values():
             method["security"] = [{"HTTPBearer": []}]

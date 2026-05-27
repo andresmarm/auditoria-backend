@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.openapi.utils import get_openapi
 from routers import auth, sesiones, planes, normas
+from routers import asistente
+  
+app.include_router(asistente.router, prefix="/api/v1/asistente", tags=["Asistente IA"])
 
 app = FastAPI(
     title="Asistente de Auditoría - API",

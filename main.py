@@ -4,6 +4,10 @@ from fastapi.security import HTTPBearer
 from fastapi.openapi.utils import get_openapi
 from routers import auth, sesiones, planes, normas
 from routers import asistente
+from routers import planes
+
+
+app.include_router(planes.router, prefix="/api/v1/planes", tags=["Planes"])
   
 app.include_router(asistente.router, prefix="/api/v1/asistente", tags=["Asistente IA"])
 

@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asistente de Auditoría — COMCAJA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:   #0D1B2A;
+    --navy2:  #1A2E42;
+    --navy3:  #243850;
+    --gold:   #C9922A;
+    --gold2:  #E8B84B;
+    --gold3:  #F5D78E;
+    --cream:  #F7F3EC;
+    --cream2: #EDE8DF;
+    --text:   #0D1B2A;
+    --muted:  #4A5E72;
+    --border: rgba(13,27,42,0.12);
+    --r:      10px;
+    --r-lg:   16px;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: 'Sora', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--navy);
+    padding: 0 2.5rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--navy3);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--gold);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px; color: var(--navy);
+    flex-shrink: 0;
+  }
+  .logo-text {
+    font-size: 15px; font-weight: 500;
+    color: #fff; letter-spacing: -0.01em;
+  }
+  .logo-sub {
+    font-size: 11px; color: rgba(255,255,255,0.45);
+    font-weight: 300; letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .header-badge {
+    font-size: 11px; color: var(--gold2);
+    border: 1px solid rgba(201,146,42,0.3);
+    padding: 4px 10px; border-radius: 20px;
+    letter-spacing: 0.05em; font-weight: 500;
+  }
+
+  /* ── LAYOUT ── */
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 1.5rem 4rem;
+  }
+
+  /* ── PANTALLA INICIO ── */
+  #screen-home {
+    width: 100%; max-width: 700px;
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; gap: 0;
+  }
+  .home-icon {
+    width: 72px; height: 72px;
+    background: var(--navy);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 2rem;
+  }
+  .home-icon svg { width: 36px; height: 36px; stroke: var(--gold2); fill: none; stroke-width: 1.5; }
+  .home-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.1; color: var(--navy);
+    margin-bottom: 1rem; letter-spacing: -0.02em;
+  }
+  .home-title em { color: var(--gold); font-style: italic; }
+  .home-desc {
+    font-size: 16px; color: var(--muted); line-height: 1.7;
+    max-width: 500px; margin-bottom: 2.5rem; font-weight: 300;
+  }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--navy); color: #fff;
+    font-family: 'Sora', sans-serif;
+    font-size: 15px; font-weight: 500;
+    padding: 14px 28px; border-radius: var(--r);
+    border: none; cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    letter-spacing: -0.01em;
+  }
+  .btn-primary:hover { background: var(--navy2); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary svg { width: 18px; height: 18px; stroke: var(--gold2); fill: none; stroke-width: 2; }
+  .home-actions {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .btn-secondary {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #fff; color: var(--navy);
+    font-family: 'Sora', sans-serif;
+    font-size: 15px; font-weight: 500;
+    padding: 13px 24px; border-radius: var(--r);
+    border: 1px solid var(--border); cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s, color 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--gold); color: var(--navy2); transform: translateY(-1px); }
+  .btn-secondary svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 2; }
+
+  .home-features {
+    margin-top: 3.5rem;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    width: 100%;
+  }
+  .feat-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 1.25rem;
+    text-align: left;
+  }
+  .feat-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--cream); display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .feat-icon svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 1.8; }
+  .feat-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--navy); }
+  .feat-desc { font-size: 12px; color: var(--muted); line-height: 1.5; font-weight: 300; }
+
+  /* ── PANTALLA WIZARD ── */
+  #screen-wizard { width: 100%; max-width: 780px; display: none; flex-direction: column; gap: 0; }
+
+  /* Progress */
+  .wizard-progress {
+    display: flex; align-items: center; gap: 0;
+    margin-bottom: 2.5rem; background: #fff;
+    border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 1.25rem 1.5rem; overflow: hidden;
+  }
+  .step-item {
+    display: flex; align-items: center; gap: 10px; flex: 1;
+  }
+  .step-item:not(:last-child)::after {
+    content: '';
+    flex: 1; height: 1px;
+    background: var(--border);
+    margin: 0 12px;
+  }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; flex-shrink: 0;
+    border: 1.5px solid var(--border);
+    color: var(--muted); background: var(--cream);
+    transition: all 0.3s;
+  }
+  .step-item.active .step-num {
+    background: var(--navy); color: #fff; border-color: var(--navy);
+  }
+  .step-item.done .step-num {
+    background: var(--gold); color: var(--navy); border-color: var(--gold);
+  }
+  .step-label { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 400; }
+  .step-item.active .step-label { color: var(--navy); font-weight: 500; }
+  .step-item.done .step-label { color: var(--gold); }
+
+  /* Step panels */
+  .step-panel { display: none; }
+  .step-panel.active { display: block; }
+
+  .panel-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 2rem;
+    margin-bottom: 1rem;
+  }
+  .panel-header { margin-bottom: 1.5rem; }
+  .panel-eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 6px;
+  }
+  .panel-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem; color: var(--navy); line-height: 1.2;
+  }
+  .panel-desc { font-size: 14px; color: var(--muted); margin-top: 6px; line-height: 1.6; font-weight: 300; }
+
+  /* Drop zone */
+  .dropzone {
+    border: 1.5px dashed var(--border); border-radius: var(--r);
+    padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative; background: var(--cream);
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--gold); background: #FDF9F2; }
+  .dropzone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon {
+    width: 48px; height: 48px; margin: 0 auto 1rem;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  }
+  .drop-icon svg { width: 24px; height: 24px; stroke: var(--gold); fill: none; stroke-width: 1.5; }
+  .drop-title { font-size: 14px; font-weight: 500; color: var(--navy); margin-bottom: 4px; }
+  .drop-sub { font-size: 12px; color: var(--muted); font-weight: 300; }
+
+  .file-selected {
+    display: none; align-items: center; gap: 12px;
+    background: #FDF9F2; border: 1px solid rgba(201,146,42,0.3);
+    border-radius: var(--r); padding: 14px 16px; margin-top: 12px;
+  }
+  .file-selected.show { display: flex; }
+  .file-icon { width: 36px; height: 36px; background: var(--gold3); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .file-icon svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 1.8; }
+  .file-name { font-size: 13px; font-weight: 500; color: var(--navy); }
+  .file-size { font-size: 11px; color: var(--muted); font-weight: 300; }
+  .file-remove {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--muted); display: flex; align-items: center; padding: 4px;
+    border-radius: 6px; transition: color 0.2s;
+  }
+  .file-remove:hover { color: #c0392b; }
+  .file-remove svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* Optional badge */
+  .optional-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--cream); border: 1px solid var(--border);
+    border-radius: 20px; padding: 4px 10px;
+    font-size: 11px; color: var(--muted); font-weight: 400;
+    margin-bottom: 1.25rem;
+  }
+  .optional-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+
+  /* Nav buttons */
+  .step-nav {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 0.5rem;
+  }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 400;
+    padding: 10px 20px; border-radius: var(--r); cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--navy); color: var(--navy); }
+  .btn-ghost svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .btn-skip {
+    background: none; border: none; font-family: 'Sora', sans-serif;
+    font-size: 13px; color: var(--muted); cursor: pointer;
+    padding: 10px 16px; border-radius: var(--r);
+    transition: color 0.2s; text-decoration: underline; text-underline-offset: 3px;
+  }
+  .btn-skip:hover { color: var(--navy); }
+  .btn-generate {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--gold); color: var(--navy);
+    font-family: 'Sora', sans-serif;
+    font-size: 15px; font-weight: 600;
+    padding: 14px 28px; border-radius: var(--r);
+    border: none; cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .btn-generate:hover { background: var(--gold2); transform: translateY(-1px); }
+  .btn-generate svg { width: 18px; height: 18px; stroke: var(--navy); fill: none; stroke-width: 2; }
+
+  /* Resumen paso */
+  .summary-pills {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1rem;
+  }
+  .summary-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--cream); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px;
+    font-size: 12px; color: var(--muted);
+  }
+  .summary-pill.loaded { background: #FDF9F2; border-color: rgba(201,146,42,0.35); color: var(--navy); }
+  .summary-pill svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ── PANTALLA RESULTADO ── */
+  #screen-result { width: 100%; max-width: 860px; display: none; flex-direction: column; gap: 1.5rem; }
+
+  .result-header {
+    background: var(--navy); border-radius: var(--r-lg);
+    padding: 2rem; display: flex; align-items: center; gap: 1.5rem;
+  }
+  .result-header-icon {
+    width: 56px; height: 56px; background: var(--gold);
+    border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .result-header-icon svg { width: 28px; height: 28px; stroke: var(--navy); fill: none; stroke-width: 1.8; }
+  .result-header h2 {
+    font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: #fff;
+    margin-bottom: 4px;
+  }
+  .result-header p { font-size: 13px; color: rgba(255,255,255,0.5); font-weight: 300; }
+  .result-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
+  .btn-action {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: #fff; font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 400;
+    padding: 9px 16px; border-radius: var(--r); cursor: pointer; transition: background 0.2s;
+  }
+  .btn-action:hover { background: rgba(255,255,255,0.15); }
+  .btn-action svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .btn-action.gold { background: var(--gold); border-color: var(--gold); color: var(--navy); font-weight: 600; }
+  .btn-action.gold:hover { background: var(--gold2); }
+  .download-panel {
+    display: none; align-items: center; justify-content: space-between; gap: 1rem;
+    background: #fff; border: 1px solid rgba(201,146,42,0.45);
+    border-radius: var(--r-lg); padding: 1.25rem 1.5rem;
+    box-shadow: 0 12px 32px rgba(20,33,61,0.08);
+  }
+  .download-panel.show { display: flex; }
+  .download-title { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 3px; }
+  .download-name { font-size: 12px; color: var(--muted); word-break: break-word; }
+  .btn-download-main {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--gold); color: var(--navy);
+    border: none; border-radius: var(--r);
+    padding: 14px 24px; font-family: 'Sora', sans-serif;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    min-width: 190px; transition: background 0.2s, transform 0.15s;
+  }
+  .btn-download-main:hover:not(:disabled) { background: var(--gold2); transform: translateY(-1px); }
+  .btn-download-main:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-download-main svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* Plan content */
+  .plan-accordion {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r-lg); overflow: hidden;
+  }
+  .accordion-toggle {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    background: #fff; border: none; border-bottom: 1px solid var(--border);
+    color: var(--navy); cursor: pointer; padding: 1.1rem 1.5rem;
+    font-family: 'Sora', sans-serif; text-align: left;
+  }
+  .accordion-toggle strong { font-size: 14px; font-weight: 600; }
+  .accordion-toggle span { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .accordion-chevron {
+    width: 18px; height: 18px; stroke: var(--gold); fill: none; stroke-width: 2;
+    transition: transform 0.2s; flex-shrink: 0;
+  }
+  .accordion-toggle.collapsed .accordion-chevron { transform: rotate(-90deg); }
+  .accordion-body { display: block; }
+  .accordion-body.collapsed { display: none; }
+  .plan-body {
+    background: #fff; padding: 2.5rem;
+    min-height: 300px; line-height: 1.75; color: var(--navy);
+    font-size: 15px;
+  }
+  .plan-body h1, .plan-body h2, .plan-body h3 {
+    font-family: 'DM Serif Display', serif; margin: 1.5rem 0 0.5rem;
+    color: var(--navy); line-height: 1.2;
+  }
+  .plan-body h1 { font-size: 1.6rem; margin-top: 0; }
+  .plan-body h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 2rem; }
+  .plan-body h3 { font-size: 1rem; font-family: 'Sora', sans-serif; font-weight: 600; margin-top: 1.2rem; }
+  .plan-body p { margin-bottom: 0.75rem; }
+  .plan-body ul, .plan-body ol { margin: 0.5rem 0 1rem 1.5rem; }
+  .plan-body li { margin-bottom: 0.35rem; }
+  .plan-body strong { font-weight: 600; }
+  .plan-body table {
+    width: 100%; border-collapse: collapse;
+    margin: 1rem 0; font-size: 13px;
+  }
+  .plan-body th {
+    background: var(--cream); text-align: left;
+    padding: 10px 12px; font-weight: 600; font-size: 12px;
+    border: 1px solid var(--border); color: var(--navy);
+  }
+  .plan-body td { padding: 9px 12px; border: 1px solid var(--border); vertical-align: top; }
+  .plan-body tr:nth-child(even) td { background: var(--cream); }
+
+  /* Streaming cursor */
+  .cursor {
+    display: inline-block; width: 2px; height: 1em;
+    background: var(--gold); vertical-align: text-bottom;
+    animation: blink 0.8s step-end infinite; margin-left: 2px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Generating state */
+  .generating-bar {
+    display: none; background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 1.5rem;
+    align-items: center; gap: 1rem;
+  }
+  .generating-bar.show { display: flex; }
+  .gen-spinner {
+    width: 36px; height: 36px; flex-shrink: 0;
+    border: 2.5px solid var(--cream2); border-top-color: var(--gold);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gen-text { font-size: 14px; color: var(--muted); }
+  .gen-text strong { color: var(--navy); font-weight: 500; }
+
+  /* Fuentes */
+  .fuentes-panel {
+    background: var(--cream); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 1.25rem 1.5rem;
+  }
+  .fuentes-title {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  .fuentes-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fuente-tag {
+    font-size: 12px; background: #fff; border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; color: var(--navy); font-weight: 400;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Nueva auditoria link */
+  .nueva-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: none; border: none; color: var(--muted);
+    font-family: 'Sora', sans-serif; font-size: 13px;
+    cursor: pointer; padding: 8px 0; text-decoration: underline;
+    text-underline-offset: 3px; transition: color 0.2s;
+  }
+  .nueva-link:hover { color: var(--navy); }
+
+  /* Planes guardados */
+  #screen-plans { width: 100%; max-width: 900px; display: none; flex-direction: column; gap: 1.25rem; }
+  .plans-header {
+    background: var(--navy); border-radius: var(--r-lg);
+    padding: 1.75rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .plans-header h2 {
+    font-family: 'DM Serif Display', serif; font-size: 1.5rem;
+    color: #fff; margin-bottom: 4px;
+  }
+  .plans-header p { color: rgba(255,255,255,0.55); font-size: 13px; }
+  .plans-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .plans-list {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .plan-item {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 1rem 1.25rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .plan-item-title { color: var(--navy); font-weight: 600; font-size: 14px; margin-bottom: 4px; word-break: break-word; }
+  .plan-item-meta { color: var(--muted); font-size: 12px; }
+  .plan-item-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .plan-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px; padding: 5px 8px; border-radius: 999px;
+    background: var(--cream); color: var(--navy);
+    border: 1px solid var(--border); font-size: 11px; font-weight: 700;
+    text-transform: uppercase;
+  }
+  .plans-empty, .plans-error {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 2rem;
+    text-align: center; color: var(--muted); font-size: 14px;
+  }
+  .plans-error { color: #9B2626; background: #FFF5F5; border-color: rgba(194,60,60,0.25); }
+
+  /* Error */
+  .error-box {
+    background: #FFF5F5; border: 1px solid rgba(194,60,60,0.25);
+    border-radius: var(--r); padding: 1rem 1.25rem;
+    font-size: 14px; color: #9B2626; display: none;
+  }
+  .error-box.show { display: block; }
+
+
+  /* ── LOGIN ── */
+  #screen-login {
+    width: 100%; max-width: 420px;
+    display: none; flex-direction: column; gap: 0;
+  }
+  .login-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 2.5rem;
+  }
+  .login-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.6rem; color: var(--navy); margin-bottom: 6px;
+  }
+  .login-sub { font-size: 13px; color: var(--muted); font-weight: 300; margin-bottom: 2rem; }
+  .login-icon {
+    width: 56px; height: 56px; background: var(--navy);
+    border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  .login-icon svg { width: 28px; height: 28px; stroke: var(--gold2); fill: none; stroke-width: 1.5; }
+  .form-group { margin-bottom: 1.25rem; }
+  .form-label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--navy); margin-bottom: 6px; letter-spacing: 0.03em;
+  }
+  .form-input {
+    width: 100%; padding: 11px 14px;
+    border: 1px solid var(--border); border-radius: var(--r);
+    font-family: 'Sora', sans-serif; font-size: 14px; color: var(--navy);
+    background: var(--cream); outline: none; transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .form-input:focus { border-color: var(--gold); background: #fff; }
+  .btn-login {
+    width: 100%; padding: 13px;
+    background: var(--navy); color: #fff;
+    font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 500;
+    border: none; border-radius: var(--r); cursor: pointer;
+    transition: background 0.2s; margin-top: 0.25rem;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-login:hover:not(:disabled) { background: var(--navy2); }
+  .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+  .login-error {
+    background: #FFF5F5; border: 1px solid rgba(194,60,60,0.25);
+    border-radius: var(--r); padding: 10px 14px;
+    font-size: 13px; color: #9B2626; display: none; margin-top: 1rem;
+  }
+  .login-error.show { display: block; }
+  .login-spinner {
+    width: 16px; height: 16px; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+    border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
+  }
+  .header-user {
+    display: none; align-items: center; gap: 10px;
+  }
+  .header-user.show { display: flex; }
+  .user-name { font-size: 13px; color: rgba(255,255,255,0.65); font-weight: 300; }
+  .btn-logout {
+    background: none; border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.6); font-family: 'Sora', sans-serif;
+    font-size: 12px; padding: 5px 12px; border-radius: 20px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-logout:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+
+  @media (max-width: 600px) {
+    header { padding: 0 1.25rem; }
+    main { padding: 1.5rem 1rem 3rem; }
+    .home-features { grid-template-columns: 1fr; }
+    .result-header { flex-direction: column; align-items: flex-start; }
+    .result-actions { margin-left: 0; }
+    .download-panel, .plans-header, .plan-item { flex-direction: column; align-items: stretch; }
+    .btn-download-main { width: 100%; }
+    .plans-actions, .plan-item-actions { width: 100%; }
+    .plan-item-actions .btn-action { flex: 1; justify-content: center; }
+    .step-label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">A</div>
+    <div>
+      <div class="logo-text">Asistente de Auditoría</div>
+      <div class="logo-sub">COMCAJA · SSF</div>
+    </div>
+  </div>
+  <div class="header-user" id="header-user">
+    <span class="user-name" id="user-name-label"></span>
+    <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── PANTALLA LOGIN ── -->
+  <div id="screen-login">
+    <div class="login-card">
+      <div class="login-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+      <div class="login-title">Iniciar sesión</div>
+      <div class="login-sub">Asistente de Auditoría · COMCAJA</div>
+      <div class="form-group">
+        <label class="form-label" for="login-email">Correo electrónico</label>
+        <input class="form-input" type="email" id="login-email" placeholder="funcionario@comcaja.gov.co" autocomplete="email" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="login-pass">Contraseña</label>
+        <input class="form-input" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <button class="btn-login" id="btn-login" onclick="doLogin()">
+        <div class="login-spinner" id="login-spinner"></div>
+        <span id="btn-login-txt">Ingresar</span>
+      </button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+
+  <!-- ── PANTALLA INICIO ── -->
+  <div id="screen-home">
+    <div class="home-icon">
+      <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+    </div>
+    <h1 class="home-title">Genera tu plan de<br><em>auditoría interna</em></h1>
+    <p class="home-desc">Fundamentado en la normatividad colombiana vigente. Carga el procedimiento a auditar y el sistema construye un plan detallado con criterios, riesgos y actividades concretas.</p>
+    <div class="home-actions">
+    <button class="btn-primary" onclick="iniciarWizard()">
+      <svg viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16"/></svg>
+      Iniciar plan de auditoría
+    </button>
+      <button class="btn-secondary" onclick="mostrarPlanesGenerados()">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Ver planes generados
+      </button>
+    </div>
+    <div class="home-features">
+      <div class="feat-card">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg></div>
+        <div class="feat-title">RAG Normativo</div>
+        <div class="feat-desc">Busca automáticamente en leyes, decretos y circulares vigentes de la SSF y COMCAJA.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+        <div class="feat-title">Plan estructurado</div>
+        <div class="feat-desc">Objetivos, alcance, criterios normativos, riesgos y programa de auditoría completo.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+        <div class="feat-title">Descarga en Word</div>
+        <div class="feat-desc">Exporta el plan generado en formato .docx listo para firmar y radicar.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PANTALLA WIZARD ── -->
+  <div id="screen-wizard">
+
+    <!-- Progress bar -->
+    <div class="wizard-progress">
+      <div class="step-item active" id="prog-1">
+        <div class="step-num">1</div>
+        <span class="step-label">Procedimiento</span>
+      </div>
+      <div class="step-item" id="prog-2">
+        <div class="step-num">2</div>
+        <span class="step-label">Matriz de riesgos</span>
+      </div>
+      <div class="step-item" id="prog-3">
+        <div class="step-num">3</div>
+        <span class="step-label">Formato de salida</span>
+      </div>
+      <div class="step-item" id="prog-4">
+        <div class="step-num">4</div>
+        <span class="step-label">Generar</span>
+      </div>
+    </div>
+
+    <!-- PASO 1: Procedimiento -->
+    <div class="step-panel active" id="step-1">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-eyebrow">Paso 1 de 3</div>
+          <div class="panel-title">Procedimiento a auditar</div>
+          <p class="panel-desc">Carga el documento del proceso o procedimiento que vas a auditar. Puede ser un PDF con el manual, flujograma o descripción del proceso.</p>
+        </div>
+        <div class="dropzone" id="dz-1" onclick="document.getElementById('file-1').click()">
+          <input type="file" id="file-1" accept=".pdf,.docx,.doc,.txt" onchange="onFileSelect(1, this)">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg></div>
+          <div class="drop-title">Arrastra el documento aquí o haz clic</div>
+          <div class="drop-sub">PDF, Word o TXT · Máx 20MB</div>
+        </div>
+        <div class="file-selected" id="fs-1">
+          <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+          <div>
+            <div class="file-name" id="fn-1">—</div>
+            <div class="file-size" id="fz-1">—</div>
+          </div>
+          <button class="file-remove" onclick="removeFile(1)"><svg viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <div class="error-box" id="err-1">Debes cargar el documento del procedimiento para continuar.</div>
+      </div>
+      <div class="step-nav">
+        <button class="btn-ghost" onclick="volverHome()">
+          <svg viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          Volver
+        </button>
+        <button class="btn-primary" onclick="irPaso(2)">
+          Continuar
+          <svg viewBox="0 0 24 24" style="stroke:var(--gold2)"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- PASO 2: Matriz de riesgos -->
+    <div class="step-panel" id="step-2">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-eyebrow">Paso 2 de 3</div>
+          <div class="panel-title">Matriz de riesgos</div>
+          <p class="panel-desc">Si tienes la matriz de riesgos del proceso, cárgala aquí. El plan de auditoría incorporará los riesgos identificados y sus controles esperados.</p>
+        </div>
+        <div class="optional-badge">Opcional — puedes omitir este paso</div>
+        <div class="dropzone" id="dz-2" onclick="document.getElementById('file-2').click()">
+          <input type="file" id="file-2" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" onchange="onFileSelect(2, this)">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg></div>
+          <div class="drop-title">Arrastra la matriz aquí o haz clic</div>
+          <div class="drop-sub">PDF, Word, Excel o TXT · Máx 20MB</div>
+        </div>
+        <div class="file-selected" id="fs-2">
+          <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg></div>
+          <div>
+            <div class="file-name" id="fn-2">—</div>
+            <div class="file-size" id="fz-2">—</div>
+          </div>
+          <button class="file-remove" onclick="removeFile(2)"><svg viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn-ghost" onclick="irPaso(1)">
+          <svg viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          Atrás
+        </button>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button class="btn-skip" onclick="irPaso(3)">Omitir este paso</button>
+          <button class="btn-primary" onclick="irPaso(3)">
+            Continuar
+            <svg viewBox="0 0 24 24" style="stroke:var(--gold2)"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 3: Formato de salida -->
+    <div class="step-panel" id="step-3">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-eyebrow">Paso 3 de 3</div>
+          <div class="panel-title">Formato institucional de salida</div>
+          <p class="panel-desc">Si tu entidad tiene un formato específico para el plan de auditoría, cárgalo aquí. El sistema respetará su estructura exacta en el documento generado.</p>
+        </div>
+        <div class="optional-badge">Opcional — puedes omitir este paso</div>
+        <div class="dropzone" id="dz-3" onclick="document.getElementById('file-3').click()">
+          <input type="file" id="file-3" accept=".pdf,.docx,.doc,.txt" onchange="onFileSelect(3, this)">
+          <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg></div>
+          <div class="drop-title">Arrastra el formato aquí o haz clic</div>
+          <div class="drop-sub">PDF, Word o TXT · Máx 20MB</div>
+        </div>
+        <div class="file-selected" id="fs-3">
+          <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg></div>
+          <div>
+            <div class="file-name" id="fn-3">—</div>
+            <div class="file-size" id="fz-3">—</div>
+          </div>
+          <button class="file-remove" onclick="removeFile(3)"><svg viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+
+        <!-- Resumen antes de generar -->
+        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px">Resumen de la auditoría</div>
+          <div class="summary-pills" id="summary-pills">
+            <div class="summary-pill" id="sp-proc">
+              <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Procedimiento: —
+            </div>
+            <div class="summary-pill" id="sp-matriz">
+              <svg viewBox="0 0 24 24"><path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+              Matriz: no cargada
+            </div>
+            <div class="summary-pill" id="sp-formato">
+              <svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+              Formato: no cargado
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn-ghost" onclick="irPaso(2)">
+          <svg viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l-7 7m7-7h18"/></svg>
+          Atrás
+        </button>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button class="btn-skip" onclick="generarPlan()">Omitir y generar</button>
+          <button class="btn-generate" onclick="generarPlan()">
+            <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Generar plan
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /screen-wizard -->
+
+  <!-- ── PANTALLA RESULTADO ── -->
+  <div id="screen-result">
+    <div class="result-header">
+      <div class="result-header-icon">
+        <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+      </div>
+      <div>
+        <h2>Plan de auditoría generado</h2>
+        <p id="result-meta">Fundamentado en normatividad colombiana vigente</p>
+      </div>
+      <div class="result-actions">
+        <button class="btn-action" onclick="copiarPlan()">
+          <svg viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+          Copiar
+        </button>
+        <button class="btn-action gold" id="btn-descargar" onclick="descargarPlan()" disabled style="opacity:0.5">
+          <svg viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span>Descargar .docx</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="generating-bar" id="gen-bar">
+      <div class="gen-spinner"></div>
+      <div class="gen-text"><strong id="gen-status">Analizando el procedimiento...</strong><br>El asistente está construyendo tu plan fundamentado en la normatividad vigente.</div>
+    </div>
+
+    <div class="download-panel" id="download-panel">
+      <div>
+        <div class="download-title">Archivo listo para descargar</div>
+        <div class="download-name" id="download-name">El plan se habilitara cuando termine la generacion.</div>
+      </div>
+      <button class="btn-download-main" id="btn-descargar-main" onclick="descargarPlan()" disabled>
+        <svg viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Descargar plan
+      </button>
+    </div>
+
+    <div class="plan-accordion" id="plan-accordion">
+      <button class="accordion-toggle" id="plan-toggle" onclick="togglePlanText()">
+        <div>
+          <strong>Texto generado</strong>
+          <span id="plan-toggle-help">Visible mientras se genera. Al finalizar quedara comprimido.</span>
+        </div>
+        <svg class="accordion-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="accordion-body" id="plan-accordion-body">
+        <div class="plan-body" id="plan-output"></div>
+      </div>
+    </div>
+
+    <div class="fuentes-panel" id="fuentes-panel" style="display:none">
+      <div class="fuentes-title">Normatividad consultada</div>
+      <div class="fuentes-list" id="fuentes-list"></div>
+    </div>
+
+    <button class="nueva-link" onclick="nuevaAuditoria()">
+      <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M12 4v16m-8-8h16"/></svg>
+      Iniciar nueva auditoría
+    </button>
+  </div>
+
+  <!-- â”€â”€ PANTALLA PLANES GUARDADOS â”€â”€ -->
+  <div id="screen-plans">
+    <div class="plans-header">
+      <div>
+        <h2>Planes generados</h2>
+        <p>Consulta y descarga los planes guardados para tu usuario.</p>
+      </div>
+      <div class="plans-actions">
+        <button class="btn-action" onclick="volverHome()">
+          <svg viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          Volver
+        </button>
+        <button class="btn-action gold" onclick="cargarPlanesGenerados()">
+          <svg viewBox="0 0 24 24"><path d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-13.657-4.657L4 6m0 9a8 8 0 0013.657 4.657L20 18"/></svg>
+          Actualizar
+        </button>
+      </div>
+    </div>
+    <div class="plans-list" id="plans-list"></div>
+  </div>
+
+</main>
+
+<script>
+// ── CONFIG ─────────────────────────────────────────────────
+// URL del backend en Railway — cámbiala por la tuya
+const API_BASE = 'https://auditoria-backend-production.up.railway.app/api/v1';
+const API_ORIGIN = API_BASE.replace(/\/api\/v1\/?$/, '');
+
+// ── AUTH ───────────────────────────────────────────────────
+const auth = {
+  token: localStorage.getItem('jwt_token') || null,
+  user:  JSON.parse(localStorage.getItem('jwt_user') || 'null')
+};
+
+function getAuthHeaders() {
+  return auth.token ? { 'Authorization': `Bearer ${auth.token}` } : {};
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const btn   = document.getElementById('btn-login');
+  const spin  = document.getElementById('login-spinner');
+  const errEl = document.getElementById('login-error');
+  const txt   = document.getElementById('btn-login-txt');
+
+  if (!email || !pass) {
+    errEl.textContent = 'Ingresa tu correo y contraseña.';
+    errEl.classList.add('show'); return;
+  }
+
+  btn.disabled = true;
+  spin.style.display = 'block';
+  txt.textContent = 'Ingresando...';
+  errEl.classList.remove('show');
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Credenciales incorrectas');
+    }
+
+    const data = await res.json();
+    auth.token = data.access_token;
+
+    // Obtener datos del usuario
+    const meRes = await fetch(`${API_BASE}/auth/me`, { headers: getAuthHeaders() });
+    if (meRes.ok) {
+      auth.user = await meRes.json();
+      localStorage.setItem('jwt_user', JSON.stringify(auth.user));
+    }
+
+    localStorage.setItem('jwt_token', auth.token);
+    mostrarUsuarioEnHeader();
+    mostrar('home');
+
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    spin.style.display = 'none';
+    txt.textContent = 'Ingresar';
+  }
+}
+
+function logout() {
+  auth.token = null; auth.user = null;
+  localStorage.removeItem('jwt_token');
+  localStorage.removeItem('jwt_user');
+  document.getElementById('header-user').classList.remove('show');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pass').value = '';
+  mostrar('login');
+}
+
+function mostrarUsuarioEnHeader() {
+  const el = document.getElementById('header-user');
+  const nm = document.getElementById('user-name-label');
+  el.classList.add('show');
+  if (auth.user) nm.textContent = auth.user.nombre_completo || auth.user.email || '';
+}
+
+// Arrancar: si hay token guardado ir al home, si no al login
+window.addEventListener('DOMContentLoaded', () => {
+  if (auth.token) {
+    mostrarUsuarioEnHeader();
+    mostrar('home');
+  } else {
+    mostrar('login');
+  }
+});
+
+// ── ESTADO ─────────────────────────────────────────────────
+const state = { files: { 1: null, 2: null, 3: null }, pasoActual: 1 };
+
+// ── NAVEGACIÓN ─────────────────────────────────────────────
+function mostrar(id) {
+  ['login','home','wizard','result','plans'].forEach(s => {
+    const el = document.getElementById('screen-' + s);
+    if (el) el.style.display = 'none';
+  });
+  const t = document.getElementById('screen-' + id);
+  if (t) t.style.display = 'flex';
+}
+
+function iniciarWizard() {
+  mostrar('wizard');
+  irPaso(1);
+}
+
+function volverHome() {
+  mostrar('home');
+  resetWizard();
+}
+
+function nuevaAuditoria() {
+  resetWizard();
+  mostrar('home');
+}
+
+function resetWizard() {
+  [1,2,3].forEach(n => removeFile(n));
+  irPaso(1);
+  document.getElementById('plan-output').innerHTML = '';
+  document.getElementById('fuentes-panel').style.display = 'none';
+  setDownloadReady(false);
+}
+
+// ── PASOS ──────────────────────────────────────────────────
+function irPaso(n) {
+  if (n === 2 && !state.files[1]) {
+    document.getElementById('err-1').classList.add('show');
+    return;
+  }
+  document.getElementById('err-1').classList.remove('show');
+
+  state.pasoActual = n;
+
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+
+  for (let i = 1; i <= 4; i++) {
+    const prog = document.getElementById('prog-' + i);
+    prog.classList.remove('active','done');
+    if (i < n) prog.classList.add('done');
+    else if (i === n) prog.classList.add('active');
+  }
+
+  if (n === 3) actualizarResumen();
+}
+
+// ── ARCHIVOS ───────────────────────────────────────────────
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function onFileSelect(n, input) {
+  const f = input.files[0];
+  if (!f) return;
+  state.files[n] = f;
+  document.getElementById('fn-' + n).textContent = f.name;
+  document.getElementById('fz-' + n).textContent = fmtBytes(f.size);
+  document.getElementById('fs-' + n).classList.add('show');
+  document.getElementById('dz-' + n).style.opacity = '0.5';
+  if (n === 1) document.getElementById('err-1').classList.remove('show');
+}
+
+function removeFile(n) {
+  state.files[n] = null;
+  const inp = document.getElementById('file-' + n);
+  if (inp) inp.value = '';
+  const fs = document.getElementById('fs-' + n);
+  if (fs) fs.classList.remove('show');
+  const dz = document.getElementById('dz-' + n);
+  if (dz) dz.style.opacity = '1';
+}
+
+// Drag & drop
+[1,2,3].forEach(n => {
+  const dz = document.getElementById('dz-' + n);
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (f) {
+      state.files[n] = f;
+      document.getElementById('fn-' + n).textContent = f.name;
+      document.getElementById('fz-' + n).textContent = fmtBytes(f.size);
+      document.getElementById('fs-' + n).classList.add('show');
+      dz.style.opacity = '0.5';
+    }
+  });
+});
+
+// ── RESUMEN PASO 3 ─────────────────────────────────────────
+function actualizarResumen() {
+  const sp1 = document.getElementById('sp-proc');
+  const sp2 = document.getElementById('sp-matriz');
+  const sp3 = document.getElementById('sp-formato');
+
+  if (state.files[1]) {
+    sp1.className = 'summary-pill loaded';
+    sp1.innerHTML = iconCheck() + truncate(state.files[1].name, 28);
+  }
+  if (state.files[2]) {
+    sp2.className = 'summary-pill loaded';
+    sp2.innerHTML = iconCheck() + truncate(state.files[2].name, 28);
+  } else {
+    sp2.className = 'summary-pill';
+    sp2.innerHTML = iconX() + 'Matriz: no cargada';
+  }
+  if (state.files[3]) {
+    sp3.className = 'summary-pill loaded';
+    sp3.innerHTML = iconCheck() + truncate(state.files[3].name, 28);
+  } else {
+    sp3.className = 'summary-pill';
+    sp3.innerHTML = iconX() + 'Formato: no cargado';
+  }
+}
+
+function iconCheck() { return '<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:var(--gold);fill:none;stroke-width:2.5;flex-shrink:0"><path d="M5 13l4 4L19 7"/></svg>'; }
+function iconX() { return '<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0"><path d="M6 18L18 6M6 6l12 12"/></svg>'; }
+function truncate(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+
+// ── ESTADO RESULTADO ───────────────────────────────────────
+const state_result = {
+  fileId: null,
+  planId: null,
+  formato: null,
+  nombre: null,
+  downloadUrl: null,
+  storagePath: null
+};
+
+// ── GENERAR PLAN ───────────────────────────────────────────
+const statusMessages = [
+  'Analizando el procedimiento...',
+  'Buscando normatividad aplicable en el RAG...',
+  'Identificando criterios y riesgos...',
+  'Construyendo el programa de auditoría...',
+  'Preparando archivo de descarga...'
+];
+
+function setPlanAccordionOpen(open) {
+  const toggle = document.getElementById('plan-toggle');
+  const body = document.getElementById('plan-accordion-body');
+  const help = document.getElementById('plan-toggle-help');
+  if (!toggle || !body) return;
+  toggle.classList.toggle('collapsed', !open);
+  body.classList.toggle('collapsed', !open);
+  if (help) {
+    help.textContent = open
+      ? 'Vista de lectura del contenido generado.'
+      : 'Comprimido para priorizar la descarga. Puedes expandirlo para revisar el texto.';
+  }
+}
+
+function togglePlanText() {
+  const body = document.getElementById('plan-accordion-body');
+  setPlanAccordionOpen(body?.classList.contains('collapsed'));
+}
+
+function setDownloadReady(ready, nombre = null) {
+  const btnHeader = document.getElementById('btn-descargar');
+  const btnMain = document.getElementById('btn-descargar-main');
+  const panel = document.getElementById('download-panel');
+  const nameEl = document.getElementById('download-name');
+  [btnHeader, btnMain].forEach(btn => {
+    if (!btn) return;
+    btn.disabled = !ready;
+    btn.style.opacity = ready ? '1' : '0.5';
+  });
+  if (panel) panel.classList.toggle('show', ready);
+  if (nameEl) nameEl.textContent = nombre || 'El plan se habilitara cuando termine la generacion.';
+}
+
+function resetResultado() {
+  Object.assign(state_result, {
+    fileId: null,
+    planId: null,
+    formato: null,
+    nombre: null,
+    downloadUrl: null,
+    storagePath: null
+  });
+  setDownloadReady(false);
+  setPlanAccordionOpen(true);
+}
+
+async function generarPlan() {
+  if (!state.files[1]) { irPaso(1); return; }
+
+  mostrar('result');
+  resetResultado();
+
+  const genBar    = document.getElementById('gen-bar');
+  const planOut   = document.getElementById('plan-output');
+  const genStatus = document.getElementById('gen-status');
+  const btnDl     = document.getElementById('btn-descargar');
+
+  genBar.classList.add('show');
+  planOut.innerHTML = '';
+  document.getElementById('fuentes-panel').style.display = 'none';
+
+  // Detectar label del botón de descarga según formato cargado
+  const fmtFile = state.files[3];
+  const fmtExt  = fmtFile ? fmtFile.name.split('.').pop().toLowerCase() : 'docx';
+  btnDl.querySelector('span').textContent = fmtFile ? `Descargar .${fmtExt}` : 'Descargar .docx';
+  const btnMain = document.getElementById('btn-descargar-main');
+  if (btnMain) btnMain.lastChild.textContent = ' Descargar plan';
+
+  let msgIdx = 0;
+  genStatus.textContent = statusMessages[0];
+  const rotador = setInterval(() => {
+    msgIdx = Math.min(msgIdx + 1, statusMessages.length - 1);
+    genStatus.textContent = statusMessages[msgIdx];
+  }, 4000);
+
+  const form = new FormData();
+  form.append('documento_proceso', state.files[1]);
+  if (state.files[2]) form.append('matriz_riesgos',  state.files[2]);
+  if (state.files[3]) form.append('formato_salida',  state.files[3]);
+
+  let acumulado   = '';
+  let streamando  = false;
+
+  try {
+    const res = await fetch(`${API_BASE}/planes/generar/stream`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: form
+    });
+
+    if (!res.ok) {
+      const errTxt = await res.text();
+      throw new Error(`Error ${res.status}: ${errTxt}`);
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // guardar línea incompleta
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let data;
+        try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (data.tipo === 'inicio') {
+          // El backend confirmó inicio — quitar spinner, mostrar cursor
+          genBar.classList.remove('show');
+          clearInterval(rotador);
+          planOut.innerHTML = '<span class="cursor"></span>';
+          streamando = true;
+
+        } else if (data.tipo === 'token' && streamando) {
+          acumulado += data.contenido;
+          planOut.innerHTML = renderMarkdown(acumulado) + '<span class="cursor"></span>';
+          planOut.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        } else if (data.tipo === 'progreso') {
+          // Fase 2: generando el archivo
+          genBar.classList.add('show');
+          genStatus.textContent = data.mensaje || 'Preparando archivo...';
+
+        } else if (data.tipo === 'fuentes' && data.lista?.length) {
+          mostrarFuentes(data.lista);
+
+        } else if (data.tipo === 'archivo') {
+          // Archivo listo para descargar
+          genBar.classList.remove('show');
+          state_result.fileId  = data.file_id;
+          state_result.planId  = data.plan_id || null;
+          state_result.formato = data.formato;
+          state_result.nombre  = data.nombre;
+          state_result.downloadUrl = data.download_url || null;
+          state_result.storagePath = data.storage_path || null;
+
+          btnDl.querySelector('span').textContent = `Descargar ${data.nombre.split('.').pop().toUpperCase()}`;
+          setDownloadReady(true, data.nombre);
+
+          // Mostrar badge de formato en el header
+          const meta = document.getElementById('result-meta');
+          const fmt  = data.formato === 'xlsx' ? '📊 Excel' : '📄 Word';
+          meta.textContent = `${fmt} · ${new Date().toLocaleDateString('es-CO', {day:'2-digit', month:'long', year:'numeric'})}`;
+
+        } else if (data.tipo === 'fin') {
+          genBar.classList.remove('show');
+          planOut.innerHTML = renderMarkdown(acumulado);
+          setPlanAccordionOpen(false);
+
+        } else if (data.tipo === 'error') {
+          throw new Error(data.detalle);
+        }
+      }
+    }
+
+  } catch (err) {
+    clearInterval(rotador);
+    genBar.classList.remove('show');
+    planOut.innerHTML = `
+      <div style="color:#9B2626;padding:1.5rem;background:#FFF5F5;border-radius:10px;line-height:1.6">
+        <strong>Error al generar el plan</strong><br>
+        ${err.message}<br><br>
+        <small style="opacity:0.65">Backend: <code>${API_BASE}</code><br>
+        Verifica que el servidor esté activo y el CORS permita este origen.</small>
+      </div>`;
+  }
+}
+
+// ── RENDER MARKDOWN ────────────────────────────────────────
+function renderMarkdown(md) {
+  // Tablas
+  md = md.replace(/^\|(.+)\|$/gm, (match) => match); // preserve table lines
+  
+  // Headings
+  md = md
+    .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
+    .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>');
+
+  // Bold / italic
+  md = md
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // Listas
+  md = md.replace(/(^[-*•]\s+.+$(\n|$))+/gm, m =>
+    '<ul>' + m.trim().split('\n').map(l => `<li>${l.replace(/^[-*•]\s+/, '')}</li>`).join('') + '</ul>'
+  );
+  md = md.replace(/(^\d+\.\s+.+$(\n|$))+/gm, m =>
+    '<ol>' + m.trim().split('\n').map(l => `<li>${l.replace(/^\d+\.\s+/, '')}</li>`).join('') + '</ol>'
+  );
+
+  // Párrafos
+  md = md.replace(/\n\n+/g, '\n\n');
+  const bloques = md.split('\n\n');
+  md = bloques.map(b => {
+    if (/^<(h[123]|ul|ol|li)/.test(b.trim())) return b;
+    if (b.trim()) return `<p>${b.trim().replace(/\n/g, ' ')}</p>`;
+    return '';
+  }).join('\n');
+
+  return md || '<p></p>';
+}
+
+// ── FUENTES ────────────────────────────────────────────────
+function mostrarFuentes(fuentes) {
+  const panel = document.getElementById('fuentes-panel');
+  const lista = document.getElementById('fuentes-list');
+  lista.innerHTML = fuentes.map(f => `<span class="fuente-tag">${f}</span>`).join('');
+  panel.style.display = 'block';
+}
+
+// ── ACCIONES RESULTADO ─────────────────────────────────────
+function copiarPlan() {
+  const texto = document.getElementById('plan-output').innerText;
+  navigator.clipboard.writeText(texto).then(() => {
+    const btn = event.currentTarget;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2"><path d="M5 13l4 4L19 7"/></svg> Copiado';
+    setTimeout(() => btn.innerHTML = orig, 2000);
+  });
+}
+
+function descargarPlan() {
+  if (state_result.fileId) {
+    // Descarga real desde el backend
+    const url = `${API_BASE}/planes/descargar/${state_result.fileId}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = state_result.nombre || 'Plan_Auditoria';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } else {
+    // Fallback: descarga el texto plano si el archivo aún no está listo
+    const texto = document.getElementById('plan-output').innerText;
+    const blob  = new Blob([texto], { type: 'text/plain;charset=utf-8' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href      = url;
+    a.download  = `Plan_Auditoria_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+}
+function buildApiUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  if (path.startsWith('/api/v1/')) return `${API_ORIGIN}${path}`;
+  if (path.startsWith('/')) return `${API_BASE}${path}`;
+  return `${API_BASE}/${path}`;
+}
+
+async function descargarArchivoAutenticado(path, nombre) {
+  const url = buildApiUrl(path);
+  const res = await fetch(url, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(detail || `No se pudo descargar el archivo (${res.status})`);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = nombre || 'Plan_Auditoria';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
+}
+
+async function descargarPlan() {
+  try {
+    if (state_result.downloadUrl || state_result.planId) {
+      const path = state_result.downloadUrl || `/api/v1/planes/${state_result.planId}/descargar`;
+      await descargarArchivoAutenticado(path, state_result.nombre);
+      return;
+    }
+
+    if (state_result.fileId) {
+      await descargarArchivoAutenticado(`/planes/descargar/${state_result.fileId}`, state_result.nombre);
+      return;
+    }
+
+    const texto = document.getElementById('plan-output').innerText;
+    const blob  = new Blob([texto], { type: 'text/plain;charset=utf-8' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href      = url;
+    a.download  = `Plan_Auditoria_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(`No se pudo descargar el plan: ${err.message}`);
+  }
+}
+
+function mostrarPlanesGenerados() {
+  mostrar('plans');
+  cargarPlanesGenerados();
+}
+
+async function cargarPlanesGenerados() {
+  const list = document.getElementById('plans-list');
+  list.innerHTML = '<div class="plans-empty">Cargando planes generados...</div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/planes`, { headers: getAuthHeaders() });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(detail || `Error ${res.status}`);
+    }
+    const data = await res.json();
+    renderPlanesGenerados(data.planes || []);
+  } catch (err) {
+    list.innerHTML = `<div class="plans-error">No se pudieron cargar los planes.<br>${err.message}</div>`;
+  }
+}
+
+function renderPlanesGenerados(planes) {
+  const list = document.getElementById('plans-list');
+  if (!planes.length) {
+    list.innerHTML = '<div class="plans-empty">Todavia no hay planes generados para este usuario.</div>';
+    return;
+  }
+
+  list.innerHTML = planes.map(plan => {
+    const fecha = plan.created_at
+      ? new Date(plan.created_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Sin fecha';
+    const formato = (plan.formato || 'docx').toUpperCase();
+    return `
+      <div class="plan-item">
+        <div>
+          <div class="plan-item-title">${escapeHtml(plan.nombre || 'Plan de auditoria')}</div>
+          <div class="plan-item-meta">${fecha}</div>
+        </div>
+        <div class="plan-item-actions">
+          <span class="plan-badge">${escapeHtml(formato)}</span>
+          <button class="btn-action gold" onclick="descargarPlanGuardado('${plan.id}', '${encodeURIComponent(plan.nombre || 'Plan_Auditoria')}')">
+            <svg viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Descargar
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function descargarPlanGuardado(planId, nombre) {
+  try {
+    await descargarArchivoAutenticado(`/api/v1/planes/${planId}/descargar`, decodeURIComponent(nombre || 'Plan_Auditoria'));
+  } catch (err) {
+    alert(`No se pudo descargar el plan: ${err.message}`);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+</script>
+</body>
+</html>

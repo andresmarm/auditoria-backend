@@ -32,6 +32,10 @@ def root():
 def health():
     return {"estado": "ok"}
 
+@app.get("/debug/rutas")
+def debug_rutas():
+    return [{"path": r.path, "methods": list(r.methods)} for r in app.routes if hasattr(r, "methods")]
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema

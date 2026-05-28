@@ -27,12 +27,18 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 
-from services.rag_engine import RAGEngine
+from services.rag_engine import (
+    vectorizar_consulta,
+    buscar_chunks_relevantes,
+    construir_prompt,
+    claude_client,
+    CLAUDE_MODEL,
+    SYSTEM_PROMPT,
+)
 from services.generador_word import generar_word_estandar, generar_word_con_formato
 from services.generador_excel import llenar_formato_excel, PROMPT_JSON_PLAN
 
 router = APIRouter()
-engine = RAGEngine()
 
 # Almacén temporal de archivos generados {file_id: bytes}
 _archivos_temp: dict[str, dict] = {}
@@ -142,14 +148,32 @@ async def generar_plan_stream(
 
         try:
             # ── FASE 1: Streaming del plan como texto ─────
-            async for token in engine.generar_plan_stream(
-                texto_proceso=texto_proceso,
-                texto_matriz=texto_matriz,
-                texto_formato=texto_formato,
-                nombre_proceso=documento_proceso.filename
-            ):
-                plan_texto.append(token)
-                yield f"data: {json.dumps({'tipo': 'token', 'contenido': token})}\n\n"
+            # Buscar chunks normativos relevantes
+            vector = vectorizar_consulta(
+                f"{documento_proceso.filename or ''} {texto_proceso[:2000]}"
+            )
+            chunks = buscar_chunks_relevantes(vector, top_k=8)
+            prompt_rag = construir_prompt(
+                f"Genera un plan de auditoría para el siguiente proceso:\n\n{texto_proceso[:4000]}",
+                chunks
+            )
+
+            # Agregar contexto de matriz y formato si existen
+            prompt_completo = prompt_rag
+            if texto_matriz:
+                prompt_completo += f"\n\n=== MATRIZ DE RIESGOS ===\n{texto_matriz[:2000]}"
+            if texto_formato:
+                prompt_completo += f"\n\n=== FORMATO INSTITUCIONAL (respetar esta estructura) ===\n{texto_formato[:1500]}"
+
+            with claude_client.messages.stream(
+                model=CLAUDE_MODEL,
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt_completo}]
+            ) as stream:
+                for token in stream.text_stream:
+                    plan_texto.append(token)
+                    yield f"data: {json.dumps({'tipo': 'token', 'contenido': token})}\n\n"
 
             plan_completo = "".join(plan_texto)
 
@@ -197,11 +221,6 @@ async def generar_plan_stream(
 
 async def _generar_xlsx(plan_texto: str, texto_proceso: str, texto_matriz: Optional[str], bytes_formato: bytes) -> tuple[bytes, str]:
     """Llama a Claude para obtener el JSON y llena el Excel del usuario."""
-    from anthropic import Anthropic
-    from core.config import settings
-
-    cliente = Anthropic(api_key=settings.anthropic_api_key)
-
     prompt = f"""{PROMPT_JSON_PLAN}
 
 === PLAN DE AUDITORÍA GENERADO ===
@@ -213,8 +232,8 @@ async def _generar_xlsx(plan_texto: str, texto_proceso: str, texto_matriz: Optio
     if texto_matriz:
         prompt += f"\n=== MATRIZ DE RIESGOS ===\n{texto_matriz[:1500]}"
 
-    response = cliente.messages.create(
-        model="claude-sonnet-4-20250514",
+    response = claude_client.messages.create(
+        model=CLAUDE_MODEL,
         max_tokens=2000,
         messages=[{"role": "user", "content": prompt}]
     )

@@ -49,7 +49,7 @@ from services.generador_word import generar_word_estandar, generar_word_con_form
 from services.generador_excel import llenar_formato_excel, PROMPT_JSON_PLAN
 
 router = APIRouter()
-PLANES_BUCKET = os.getenv("PLANES_BUCKET", "documentos")
+PLANES_BUCKET = os.getenv("PLANES_BUCKET", "planes")
 
 # Almacén temporal de archivos generados {file_id: bytes}
 _archivos_temp: dict[str, dict] = {}

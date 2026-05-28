@@ -23,7 +23,7 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 claude_client  = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 EMBEDDING_MODEL = "text-embedding-3-small"
-CLAUDE_MODEL    = "claude-sonnet-4-20250514"
+CLAUDE_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 TOP_K           = 6
 MAX_TOKENS      = 2048
 

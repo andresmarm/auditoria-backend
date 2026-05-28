@@ -26,10 +26,17 @@ import re
 import unicodedata
 from typing import Optional
 from json import JSONDecodeError
+from uuid import UUID
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import StreamingResponse, FileResponse
+from sqlalchemy.orm import Session
 
+from core.database import get_db, supabase_admin
+from core.security import get_current_user
+from models.usuario import Usuario
+from models.sesion import SesionAuditoria
+from models.plan import PlanAuditoria
 from services.rag_engine import (
     vectorizar_consulta,
     buscar_chunks_relevantes,
@@ -42,6 +49,7 @@ from services.generador_word import generar_word_estandar, generar_word_con_form
 from services.generador_excel import llenar_formato_excel, PROMPT_JSON_PLAN
 
 router = APIRouter()
+PLANES_BUCKET = os.getenv("PLANES_BUCKET", "documentos")
 
 # Almacén temporal de archivos generados {file_id: bytes}
 _archivos_temp: dict[str, dict] = {}
@@ -122,6 +130,76 @@ def _nombre_archivo_seguro(nombre: str, extension: str) -> str:
     return f"{base}.{extension.lstrip('.')}"
 
 
+def _media_type(fmt: str) -> str:
+    return {
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }.get(fmt, "application/octet-stream")
+
+
+def _fuentes_desde_chunks(chunks: list[dict]) -> list[dict]:
+    fuentes, vistos = [], set()
+    for chunk in chunks:
+        key = chunk.get("codigo_norma") or chunk.get("titulo_norma")
+        if not key or key in vistos:
+            continue
+        vistos.add(key)
+        fuentes.append({
+            "codigo": chunk.get("codigo_norma"),
+            "titulo": chunk.get("titulo_norma"),
+            "articulo": chunk.get("articulo"),
+        })
+    return fuentes
+
+
+def _subir_plan_storage(path: str, contenido: bytes, fmt: str) -> None:
+    supabase_admin.storage.from_(PLANES_BUCKET).upload(
+        path,
+        contenido,
+        {"content-type": _media_type(fmt), "upsert": "true"},
+    )
+
+
+def _crear_registro_plan(
+    db: Session,
+    current: Usuario,
+    nombre_proceso: str,
+    plan_texto: str,
+    chunks: list[dict],
+    storage_path: str,
+    nombre_archivo: str,
+    fmt: str,
+    file_id: str,
+) -> PlanAuditoria:
+    sesion = SesionAuditoria(
+        usuario_id=current.id,
+        entidad_id=current.entidad_id,
+        nombre_proceso=nombre_proceso,
+        estado="plan_generado",
+    )
+    db.add(sesion)
+    db.flush()
+
+    plan = PlanAuditoria(
+        sesion_id=sesion.id,
+        contenido_json={
+            "file_id": file_id,
+            "nombre_archivo": nombre_archivo,
+            "formato": fmt,
+            "bucket": PLANES_BUCKET,
+        },
+        contenido_texto=plan_texto,
+        normas_citadas=_fuentes_desde_chunks(chunks),
+        chunks_usados=[],
+        storage_docx=storage_path,
+        modelo_ia=CLAUDE_MODEL,
+    )
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
 # ── Endpoint principal ────────────────────────────────────
 
 @router.post("/generar/stream")
@@ -129,6 +207,8 @@ async def generar_plan_stream(
     documento_proceso: UploadFile = File(...),
     matriz_riesgos:    UploadFile = File(None),
     formato_salida:    UploadFile = File(None),
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(get_current_user),
 ):
     """
     Genera el plan de auditoría en streaming SSE.
@@ -218,7 +298,21 @@ async def generar_plan_stream(
                 "fmt":    fmt
             }
 
-            yield f"data: {json.dumps({'tipo': 'archivo', 'file_id': file_id, 'formato': fmt, 'nombre': nombre_archivo})}\n\n"
+            storage_path = f"planes/{current.id}/{file_id}/{nombre_archivo}"
+            _subir_plan_storage(storage_path, archivo_bytes, fmt)
+            plan = _crear_registro_plan(
+                db=db,
+                current=current,
+                nombre_proceso=documento_proceso.filename or nombre_archivo,
+                plan_texto=plan_completo,
+                chunks=chunks,
+                storage_path=storage_path,
+                nombre_archivo=nombre_archivo,
+                fmt=fmt,
+                file_id=file_id,
+            )
+
+            yield f"data: {json.dumps({'tipo': 'archivo', 'file_id': file_id, 'plan_id': str(plan.id), 'formato': fmt, 'nombre': nombre_archivo, 'storage_path': storage_path, 'download_url': f'/api/v1/planes/{plan.id}/descargar'})}\n\n"
             yield f"data: {json.dumps({'tipo': 'fin'})}\n\n"
 
         except Exception as e:
@@ -356,6 +450,68 @@ Debe conservar esta estructura:
 
 
 # ── Endpoint de descarga ──────────────────────────────────
+@router.get("")
+async def listar_planes(
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(get_current_user),
+):
+    """Lista planes generados por el usuario autenticado."""
+    planes = (
+        db.query(PlanAuditoria)
+        .join(SesionAuditoria, PlanAuditoria.sesion_id == SesionAuditoria.id)
+        .filter(SesionAuditoria.usuario_id == current.id)
+        .order_by(PlanAuditoria.created_at.desc())
+        .all()
+    )
+    resultado = []
+    for plan in planes:
+        meta = plan.contenido_json or {}
+        fmt = meta.get("formato") or "docx"
+        nombre = meta.get("nombre_archivo") or _nombre_archivo_seguro("Plan_Auditoria", fmt)
+        resultado.append({
+            "id": str(plan.id),
+            "sesion_id": str(plan.sesion_id),
+            "nombre": nombre,
+            "formato": fmt,
+            "storage_path": plan.storage_docx,
+            "modelo_ia": plan.modelo_ia,
+            "created_at": plan.created_at.isoformat() if plan.created_at else None,
+            "download_url": f"/api/v1/planes/{plan.id}/descargar",
+        })
+    return {"planes": resultado, "total": len(resultado)}
+
+
+@router.get("/{plan_id}/descargar")
+async def descargar_plan_persistido(
+    plan_id: UUID,
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(get_current_user),
+):
+    """Descarga un plan persistido en Supabase Storage."""
+    plan = (
+        db.query(PlanAuditoria)
+        .join(SesionAuditoria, PlanAuditoria.sesion_id == SesionAuditoria.id)
+        .filter(PlanAuditoria.id == plan_id, SesionAuditoria.usuario_id == current.id)
+        .first()
+    )
+    if not plan or not plan.storage_docx:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    meta = plan.contenido_json or {}
+    fmt = meta.get("formato") or "docx"
+    nombre = meta.get("nombre_archivo") or _nombre_archivo_seguro("Plan_Auditoria", fmt)
+
+    try:
+        contenido = supabase_admin.storage.from_(PLANES_BUCKET).download(plan.storage_docx)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error descargando plan: {str(e)}")
+
+    return StreamingResponse(
+        io.BytesIO(contenido),
+        media_type=_media_type(fmt),
+        headers={"Content-Disposition": f'attachment; filename="{_nombre_archivo_seguro(nombre, fmt)}"'},
+    )
+
 
 @router.get("/descargar/{file_id}")
 async def descargar_plan(file_id: str):

@@ -22,6 +22,8 @@ import json
 import uuid
 import tempfile
 import os
+import re
+import unicodedata
 from typing import Optional
 from json import JSONDecodeError
 
@@ -111,6 +113,15 @@ def _detectar_tipo_formato(filename: str) -> str:
     return "ninguno"
 
 
+def _nombre_archivo_seguro(nombre: str, extension: str) -> str:
+    """Genera un filename ASCII valido para Content-Disposition."""
+    base = os.path.splitext(nombre or "")[0] or "Plan_Auditoria"
+    base = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode("ascii")
+    base = re.sub(r"[^A-Za-z0-9_.-]+", "_", base).strip("._-")
+    base = base[:80] or "Plan_Auditoria"
+    return f"{base}.{extension.lstrip('.')}"
+
+
 # ── Endpoint principal ────────────────────────────────────
 
 @router.post("/generar/stream")
@@ -191,13 +202,13 @@ async def generar_plan_stream(
             elif tipo_formato == "docx":
                 # Word respetando la estructura del formato cargado
                 archivo_bytes = generar_word_con_formato(plan_completo, bytes_formato)
-                nombre_archivo = f"Plan_Auditoria_{documento_proceso.filename.split('.')[0]}.docx"
+                nombre_archivo = _nombre_archivo_seguro(f"Plan_Auditoria_{documento_proceso.filename}", "docx")
                 fmt = "docx"
 
             else:
                 # Word estructurado estándar
                 archivo_bytes = generar_word_estandar(plan_completo, documento_proceso.filename)
-                nombre_archivo = f"Plan_Auditoria_{documento_proceso.filename.split('.')[0]}.docx"
+                nombre_archivo = _nombre_archivo_seguro(f"Plan_Auditoria_{documento_proceso.filename}", "docx")
                 fmt = "docx"
 
             # Guardar en memoria para la descarga posterior
@@ -253,7 +264,7 @@ Reglas adicionales:
         raise ValueError("No se pudo convertir la respuesta de IA en un JSON valido para Excel.")
 
     excel_bytes = llenar_formato_excel(plan_json, bytes_formato)
-    nombre = f"Plan_Auditoria_{plan_json.get('proceso', 'auditoria')[:30].replace(' ', '_')}.xlsx"
+    nombre = _nombre_archivo_seguro(f"Plan_Auditoria_{plan_json.get('proceso', 'auditoria')[:30]}", "xlsx")
     return excel_bytes, nombre
 
 
@@ -363,5 +374,5 @@ async def descargar_plan(file_id: str):
     return StreamingResponse(
         io.BytesIO(info["bytes"]),
         media_type=media_types.get(fmt, "application/octet-stream"),
-        headers={"Content-Disposition": f'attachment; filename="{info["nombre"]}"'}
+        headers={"Content-Disposition": f'attachment; filename="{_nombre_archivo_seguro(info["nombre"], fmt)}"'}
     )

@@ -18,7 +18,9 @@ Mapa de celdas master (celdas combinadas, se escribe en la master):
   A31  → observaciones                (rango A31:H31)
 """
 
-import io, copy
+import io, copy, re
+from zipfile import ZipFile, ZIP_DEFLATED
+from xml.etree import ElementTree as ET
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
@@ -68,7 +70,7 @@ def llenar_formato_excel(plan_json: dict, template_bytes: bytes) -> bytes:
     out = io.BytesIO()
     wb.save(out)
     out.seek(0)
-    return out.read()
+    return _preservar_recursos_template(template_bytes, out.read())
 
 
 def _set(ws, coord: str, valor: str, wrap: bool = False):
@@ -93,6 +95,79 @@ def _set(ws, coord: str, valor: str, wrap: bool = False):
                 if wrap:
                     m_cell.alignment = Alignment(wrap_text=True, vertical="top")
                 break
+
+
+def _preservar_recursos_template(template_bytes: bytes, generated_bytes: bytes) -> bytes:
+    """Reinyecta imagenes/drawings que openpyxl puede descartar al guardar."""
+    with ZipFile(io.BytesIO(template_bytes), "r") as template_zip:
+        template_names = set(template_zip.namelist())
+        recursos = [
+            name for name in template_names
+            if name.startswith(("xl/media/", "xl/drawings/", "xl/printerSettings/"))
+        ]
+        sheet_rels = "xl/worksheets/_rels/sheet1.xml.rels"
+        tiene_drawing = "xl/drawings/drawing1.xml" in template_names and sheet_rels in template_names
+
+        if not recursos and not tiene_drawing:
+            return generated_bytes
+
+        salida = io.BytesIO()
+        omitidos = set(recursos)
+        if tiene_drawing:
+            omitidos.add(sheet_rels)
+
+        with ZipFile(io.BytesIO(generated_bytes), "r") as generated_zip:
+            with ZipFile(salida, "w", ZIP_DEFLATED) as output_zip:
+                for item in generated_zip.infolist():
+                    if item.filename in omitidos:
+                        continue
+                    data = generated_zip.read(item.filename)
+                    if item.filename == "xl/worksheets/sheet1.xml" and tiene_drawing:
+                        data = _agregar_drawing_a_sheet(data)
+                    elif item.filename == "[Content_Types].xml":
+                        data = _agregar_content_types(data, template_zip)
+                    output_zip.writestr(item, data)
+
+                for name in recursos:
+                    output_zip.writestr(name, template_zip.read(name))
+                if tiene_drawing:
+                    output_zip.writestr(sheet_rels, template_zip.read(sheet_rels))
+
+        return salida.getvalue()
+
+
+def _agregar_drawing_a_sheet(sheet_xml: bytes) -> bytes:
+    texto = sheet_xml.decode("utf-8")
+    texto = re.sub(r"<drawing\b[^>]*/>", "", texto)
+    if "xmlns:r=" not in texto:
+        texto = texto.replace(
+            "<worksheet ",
+            '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ',
+            1,
+        )
+    return texto.replace("</worksheet>", '<drawing r:id="rId2"/></worksheet>').encode("utf-8")
+
+
+def _agregar_content_types(content_xml: bytes, template_zip: ZipFile) -> bytes:
+    ns = "http://schemas.openxmlformats.org/package/2006/content-types"
+    ET.register_namespace("", ns)
+    root = ET.fromstring(content_xml)
+
+    defaults = {el.attrib.get("Extension") for el in root.findall(f"{{{ns}}}Default")}
+    overrides = {el.attrib.get("PartName") for el in root.findall(f"{{{ns}}}Override")}
+
+    template_content = ET.fromstring(template_zip.read("[Content_Types].xml"))
+    for default in template_content.findall(f"{{{ns}}}Default"):
+        extension = default.attrib.get("Extension", "")
+        if extension in {"png", "bin"} and extension not in defaults:
+            ET.SubElement(root, f"{{{ns}}}Default", default.attrib)
+
+    for override in template_content.findall(f"{{{ns}}}Override"):
+        part_name = override.attrib.get("PartName", "")
+        if part_name.startswith("/xl/drawings/") and part_name not in overrides:
+            ET.SubElement(root, f"{{{ns}}}Override", override.attrib)
+
+    return ET.tostring(root, encoding="utf-8", xml_declaration=False)
 
 
 # ── PROMPT JSON para Claude ───────────────────────────────

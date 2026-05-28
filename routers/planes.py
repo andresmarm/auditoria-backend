@@ -175,7 +175,7 @@ def _crear_registro_plan(
         usuario_id=current.id,
         entidad_id=current.entidad_id,
         nombre_proceso=nombre_proceso,
-        estado="iniciada",
+        estado="completada",
     )
     db.add(sesion)
     db.flush()
@@ -298,7 +298,7 @@ async def generar_plan_stream(
                 "fmt":    fmt
             }
 
-            storage_path = f"planes/{current.id}/{file_id}/{nombre_archivo}"
+            storage_path = f"{current.id}/{file_id}/{nombre_archivo}"
             _subir_plan_storage(storage_path, archivo_bytes, fmt)
             plan = _crear_registro_plan(
                 db=db,

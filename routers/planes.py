@@ -23,6 +23,7 @@ import uuid
 import tempfile
 import os
 from typing import Optional
+from json import JSONDecodeError
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
@@ -223,6 +224,12 @@ async def _generar_xlsx(plan_texto: str, texto_proceso: str, texto_matriz: Optio
     """Llama a Claude para obtener el JSON y llena el Excel del usuario."""
     prompt = f"""{PROMPT_JSON_PLAN}
 
+Reglas adicionales:
+- Devuelve solo un objeto JSON valido.
+- No incluyas markdown.
+- No incluyas saltos de linea literales dentro de strings.
+- Usa textos concisos para evitar truncamiento.
+
 === PLAN DE AUDITORÍA GENERADO ===
 {plan_texto[:6000]}
 
@@ -234,22 +241,107 @@ async def _generar_xlsx(plan_texto: str, texto_proceso: str, texto_matriz: Optio
 
     response = claude_client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=2000,
+        max_tokens=4000,
         messages=[{"role": "user", "content": prompt}]
     )
 
     raw = response.content[0].text.strip()
-    # Limpiar posibles bloques ```json ... ```
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
+    plan_json = _parsear_plan_json(raw)
+    if plan_json is None:
+        plan_json = _reparar_plan_json(raw, plan_texto)
+    if plan_json is None:
+        raise ValueError("No se pudo convertir la respuesta de IA en un JSON valido para Excel.")
 
-    plan_json = json.loads(raw)
     excel_bytes = llenar_formato_excel(plan_json, bytes_formato)
     nombre = f"Plan_Auditoria_{plan_json.get('proceso', 'auditoria')[:30].replace(' ', '_')}.xlsx"
     return excel_bytes, nombre
+
+
+def _parsear_plan_json(raw: str) -> dict | None:
+    """Extrae y parsea el primer objeto JSON de una respuesta de Claude."""
+    candidato = _extraer_objeto_json(raw)
+    if not candidato:
+        return None
+    try:
+        return json.loads(candidato)
+    except JSONDecodeError:
+        return None
+
+
+def _extraer_objeto_json(raw: str) -> str | None:
+    texto = raw.strip()
+    if texto.startswith("```"):
+        partes = texto.split("```")
+        texto = partes[1] if len(partes) > 1 else texto
+        texto = texto.strip()
+        if texto.startswith("json"):
+            texto = texto[4:].strip()
+
+    inicio = texto.find("{")
+    if inicio == -1:
+        return None
+
+    en_string = False
+    escape = False
+    profundidad = 0
+    for i, ch in enumerate(texto[inicio:], inicio):
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            en_string = not en_string
+            continue
+        if en_string:
+            continue
+        if ch == "{":
+            profundidad += 1
+        elif ch == "}":
+            profundidad -= 1
+            if profundidad == 0:
+                return texto[inicio:i + 1]
+    return texto[inicio:]
+
+
+def _reparar_plan_json(raw: str, plan_texto: str) -> dict | None:
+    prompt = f"""Corrige la siguiente respuesta y devuelve UNICAMENTE un JSON valido.
+No uses markdown. No agregues explicaciones. No incluyas saltos de linea literales dentro de strings.
+
+Debe conservar esta estructura:
+{{
+  "auditoria": "",
+  "fecha_inicio": "YYYY-MM-DD",
+  "fecha_fin": "YYYY-MM-DD",
+  "proceso": "",
+  "ubicacion": "",
+  "lugar": "",
+  "antecedentes": "",
+  "objetivo_general": "",
+  "alcance": "",
+  "actividades": [
+    {{"proceso": "", "fecha": "YYYY-MM-DD", "hora": "HH:MM", "auditado": "", "auditor": ""}}
+  ],
+  "documentos_referencia": "",
+  "observaciones": ""
+}}
+
+=== RESPUESTA JSON INVALIDA ===
+{raw[:8000]}
+
+=== PLAN DE REFERENCIA ===
+{plan_texto[:3000]}
+"""
+    try:
+        response = claude_client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+    except Exception:
+        return None
+    return _parsear_plan_json(response.content[0].text)
 
 
 # ── Endpoint de descarga ──────────────────────────────────

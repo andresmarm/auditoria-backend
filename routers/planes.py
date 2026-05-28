@@ -175,7 +175,7 @@ def _crear_registro_plan(
         usuario_id=current.id,
         entidad_id=current.entidad_id,
         nombre_proceso=nombre_proceso,
-        estado="plan_generado",
+        estado="iniciada",
     )
     db.add(sesion)
     db.flush()

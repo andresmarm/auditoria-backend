@@ -17,11 +17,16 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-# Usa el RAGEngine que ya existe en el proyecto
-from services.rag_engine import RAGEngine
+from services.rag_engine import (
+    vectorizar_consulta,
+    buscar_chunks_relevantes,
+    construir_prompt,
+    claude_client,
+    CLAUDE_MODEL,
+    MAX_TOKENS,
+)
 
 router  = APIRouter()
-engine  = RAGEngine()
 
 # Historial en memoria por sesión (máx 10 mensajes = 5 turnos)
 _historial: dict[str, list[dict]] = {}
@@ -66,22 +71,15 @@ def _add_historial(sesion_id: str, role: str, content: str):
 def _extraer_fuentes(chunks: list[dict]) -> list[str]:
     fuentes, vistos = [], set()
     for c in chunks:
-        key = c.get("norma_codigo") or c.get("norma_nombre") or c.get("titulo_norma", "")
+        key = c.get("codigo_norma") or c.get("titulo_norma") or c.get("norma_nombre", "")
         if key and key not in vistos:
             vistos.add(key)
             fuentes.append(key)
     return fuentes
 
 def _construir_prompt(pregunta: str, chunks: list[dict]) -> str:
-    """Usa el formateador del RAGEngine existente más contexto conversacional."""
-    contexto = engine.formatear_chunks(chunks)
-    return f"""CONTEXTO NORMATIVO:
-{contexto}
-
----
-PREGUNTA: {pregunta}
-
-Responde basándote únicamente en el contexto normativo anterior. Cita las fuentes."""
+    """Construye el prompt con el formateador RAG existente."""
+    return construir_prompt(pregunta, chunks)
 
 
 # ── Endpoints ─────────────────────────────────────────────
@@ -93,16 +91,17 @@ async def consulta_sincrona(body: ConsultaRequest):
         raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía")
 
     sesion_id = body.sesion_id or str(uuid.uuid4())
-    chunks    = engine.buscar_chunks(body.pregunta, top_k=6)
+    vector    = vectorizar_consulta(body.pregunta)
+    chunks    = buscar_chunks_relevantes(vector, top_k=6)
     prompt    = _construir_prompt(body.pregunta, chunks)
 
     historial = _get_historial(sesion_id)
     mensajes  = historial + [{"role": "user", "content": prompt}]
 
     try:
-        response = engine.anthropic.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2048,
+        response = claude_client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=MAX_TOKENS,
             system=SYSTEM_ASISTENTE,
             messages=mensajes
         )
@@ -137,7 +136,8 @@ async def consulta_streaming(body: ConsultaRequest):
         raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía")
 
     sesion_id = body.sesion_id or str(uuid.uuid4())
-    chunks    = engine.buscar_chunks(body.pregunta, top_k=6)
+    vector    = vectorizar_consulta(body.pregunta)
+    chunks    = buscar_chunks_relevantes(vector, top_k=6)
     prompt    = _construir_prompt(body.pregunta, chunks)
     historial = _get_historial(sesion_id)
     mensajes  = historial + [{"role": "user", "content": prompt}]
@@ -148,9 +148,9 @@ async def consulta_streaming(body: ConsultaRequest):
     async def sse():
         yield f"data: {json.dumps({'tipo': 'inicio', 'sesion_id': sesion_id})}\n\n"
         try:
-            with engine.anthropic.messages.stream(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2048,
+            with claude_client.messages.stream(
+                model=CLAUDE_MODEL,
+                max_tokens=MAX_TOKENS,
                 system=SYSTEM_ASISTENTE,
                 messages=mensajes
             ) as stream:

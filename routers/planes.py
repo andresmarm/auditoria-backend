@@ -19,6 +19,7 @@ y al final emite un evento con la URL de descarga del archivo.
 
 import io
 import json
+import logging
 import uuid
 import tempfile
 import os
@@ -49,6 +50,7 @@ from services.generador_word import generar_word_estandar, generar_word_con_form
 from services.generador_excel import llenar_formato_excel, PROMPT_JSON_PLAN
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 PLANES_BUCKET = os.getenv("PLANES_BUCKET", "planes")
 
 # Almacén temporal de archivos generados {file_id: bytes}
@@ -65,9 +67,9 @@ def extraer_texto(archivo: UploadFile) -> str:
 
     if nombre.endswith(".pdf"):
         return _texto_pdf(contenido)
-    elif nombre.endswith(".docx") or nombre.endswith(".doc"):
+    elif nombre.endswith(".docx"):
         return _texto_docx(contenido)
-    elif nombre.endswith((".xlsx", ".xls")):
+    elif nombre.endswith(".xlsx"):
         return _texto_xlsx(contenido)
     else:
         return contenido.decode("utf-8", errors="ignore")
@@ -114,9 +116,9 @@ def _texto_xlsx(data: bytes) -> str:
 def _detectar_tipo_formato(filename: str) -> str:
     """Devuelve 'xlsx', 'docx' o 'ninguno'."""
     nombre = (filename or "").lower()
-    if nombre.endswith(".xlsx") or nombre.endswith(".xls"):
+    if nombre.endswith(".xlsx"):
         return "xlsx"
-    if nombre.endswith(".docx") or nombre.endswith(".doc"):
+    if nombre.endswith(".docx"):
         return "docx"
     return "ninguno"
 
@@ -128,6 +130,21 @@ def _nombre_archivo_seguro(nombre: str, extension: str) -> str:
     base = re.sub(r"[^A-Za-z0-9_.-]+", "_", base).strip("._-")
     base = base[:80] or "Plan_Auditoria"
     return f"{base}.{extension.lstrip('.')}"
+
+
+def _validar_extension(archivo: UploadFile | None, campo: str, permitidas: set[str]) -> None:
+    if not archivo:
+        return
+    extension = os.path.splitext(archivo.filename or "")[1].lower()
+    if extension in {".xls", ".doc"}:
+        moderna = {".xls": ".xlsx", ".doc": ".docx"}[extension]
+        raise HTTPException(
+            status_code=400,
+            detail=f"{campo}: el formato {extension} no es compatible. Convierte el archivo a {moderna}.",
+        )
+    if extension not in permitidas:
+        formatos = ", ".join(sorted(permitidas))
+        raise HTTPException(status_code=400, detail=f"{campo}: formato no compatible. Usa: {formatos}.")
 
 
 def _media_type(fmt: str) -> str:
@@ -221,6 +238,10 @@ async def generar_plan_stream(
       {"tipo": "fin"}
       {"tipo": "error",     "detalle": "..."}
     """
+    _validar_extension(documento_proceso, "documento_proceso", {".pdf", ".docx", ".txt"})
+    _validar_extension(matriz_riesgos, "matriz_riesgos", {".pdf", ".docx", ".xlsx", ".txt"})
+    _validar_extension(formato_salida, "formato_salida", {".docx", ".xlsx"})
+
     # Leer archivos en memoria antes del streaming
     texto_proceso  = extraer_texto(documento_proceso)
     texto_matriz   = extraer_texto(matriz_riesgos)  if matriz_riesgos   else None
@@ -235,15 +256,20 @@ async def generar_plan_stream(
 
     async def sse():
         plan_texto = []
+        fase = "inicio"
 
         yield f"data: {json.dumps({'tipo': 'inicio', 'file_id': file_id})}\n\n"
 
         try:
             # ── FASE 1: Streaming del plan como texto ─────
             # Buscar chunks normativos relevantes
+            fase = "vectorizando consulta"
+            logger.info("Generando plan %s: %s", file_id, fase)
             vector = vectorizar_consulta(
                 f"{documento_proceso.filename or ''} {texto_proceso[:2000]}"
             )
+            fase = "buscando normas relevantes"
+            logger.info("Generando plan %s: %s", file_id, fase)
             chunks = buscar_chunks_relevantes(vector, top_k=8)
             prompt_rag = construir_prompt(
                 f"Genera un plan de auditoría para el siguiente proceso:\n\n{texto_proceso[:4000]}",
@@ -257,6 +283,8 @@ async def generar_plan_stream(
             if texto_formato:
                 prompt_completo += f"\n\n=== FORMATO INSTITUCIONAL (respetar esta estructura) ===\n{texto_formato[:1500]}"
 
+            fase = "generando texto con Claude"
+            logger.info("Generando plan %s: %s", file_id, fase)
             with claude_client.messages.stream(
                 model=CLAUDE_MODEL,
                 max_tokens=4096,
@@ -272,6 +300,8 @@ async def generar_plan_stream(
             # ── FASE 2: Generar el archivo de descarga ────
             yield f"data: {json.dumps({'tipo': 'progreso', 'mensaje': 'Generando archivo de descarga...'})}\n\n"
 
+            fase = "generando archivo de descarga"
+            logger.info("Generando plan %s: %s", file_id, fase)
             if tipo_formato == "xlsx":
                 # Pedir a Claude el JSON estructurado para llenar el Excel
                 archivo_bytes, nombre_archivo = await _generar_xlsx(
@@ -299,7 +329,11 @@ async def generar_plan_stream(
             }
 
             storage_path = f"{current.id}/{file_id}/{nombre_archivo}"
+            fase = "subiendo archivo a storage"
+            logger.info("Generando plan %s: %s", file_id, fase)
             _subir_plan_storage(storage_path, archivo_bytes, fmt)
+            fase = "guardando registro en base de datos"
+            logger.info("Generando plan %s: %s", file_id, fase)
             plan = _crear_registro_plan(
                 db=db,
                 current=current,
@@ -314,9 +348,13 @@ async def generar_plan_stream(
 
             yield f"data: {json.dumps({'tipo': 'archivo', 'file_id': file_id, 'plan_id': str(plan.id), 'formato': fmt, 'nombre': nombre_archivo, 'storage_path': storage_path, 'download_url': f'/api/v1/planes/{plan.id}/descargar'})}\n\n"
             yield f"data: {json.dumps({'tipo': 'fin'})}\n\n"
+            logger.info("Plan %s generado correctamente", file_id)
 
         except Exception as e:
-            yield f"data: {json.dumps({'tipo': 'error', 'detalle': str(e)})}\n\n"
+            db.rollback()
+            logger.exception("Error generando plan %s durante la fase '%s'", file_id, fase)
+            detalle = str(e) or type(e).__name__
+            yield f"data: {json.dumps({'tipo': 'error', 'detalle': detalle, 'fase': fase, 'file_id': file_id})}\n\n"
 
     return StreamingResponse(
         sse(),

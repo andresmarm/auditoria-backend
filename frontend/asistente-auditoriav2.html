@@ -692,8 +692,8 @@
           <div class="panel-title">Procedimiento a auditar</div>
           <p class="panel-desc">Carga el documento del proceso o procedimiento que vas a auditar. Puede ser un PDF con el manual, flujograma o descripción del proceso.</p>
         </div>
-        <div class="dropzone" id="dz-1" onclick="document.getElementById('file-1').click()">
-          <input type="file" id="file-1" accept=".pdf,.docx,.doc,.txt" onchange="onFileSelect(1, this)">
+        <div class="dropzone" id="dz-1">
+          <input type="file" id="file-1" accept=".pdf,.docx,.txt" onchange="onFileSelect(1, this)">
           <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg></div>
           <div class="drop-title">Arrastra el documento aquí o haz clic</div>
           <div class="drop-sub">PDF, Word o TXT · Máx 20MB</div>
@@ -729,8 +729,8 @@
           <p class="panel-desc">Si tienes la matriz de riesgos del proceso, cárgala aquí. El plan de auditoría incorporará los riesgos identificados y sus controles esperados.</p>
         </div>
         <div class="optional-badge">Opcional — puedes omitir este paso</div>
-        <div class="dropzone" id="dz-2" onclick="document.getElementById('file-2').click()">
-          <input type="file" id="file-2" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" onchange="onFileSelect(2, this)">
+        <div class="dropzone" id="dz-2">
+          <input type="file" id="file-2" accept=".pdf,.docx,.xlsx,.txt" onchange="onFileSelect(2, this)">
           <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg></div>
           <div class="drop-title">Arrastra la matriz aquí o haz clic</div>
           <div class="drop-sub">PDF, Word, Excel o TXT · Máx 20MB</div>
@@ -768,11 +768,11 @@
           <p class="panel-desc">Si tu entidad tiene un formato específico para el plan de auditoría, cárgalo aquí. El sistema respetará su estructura exacta en el documento generado.</p>
         </div>
         <div class="optional-badge">Opcional — puedes omitir este paso</div>
-        <div class="dropzone" id="dz-3" onclick="document.getElementById('file-3').click()">
-          <input type="file" id="file-3" accept=".pdf,.docx,.doc,.txt" onchange="onFileSelect(3, this)">
+        <div class="dropzone" id="dz-3">
+          <input type="file" id="file-3" accept=".docx,.xlsx" onchange="onFileSelect(3, this)">
           <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg></div>
           <div class="drop-title">Arrastra el formato aquí o haz clic</div>
-          <div class="drop-sub">PDF, Word o TXT · Máx 20MB</div>
+          <div class="drop-sub">Word o Excel (.xlsx) · Máx 20MB</div>
         </div>
         <div class="file-selected" id="fs-3">
           <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg></div>
@@ -1070,6 +1070,21 @@ function fmtBytes(b) {
 function onFileSelect(n, input) {
   const f = input.files[0];
   if (!f) return;
+  seleccionarArchivo(n, f);
+}
+
+function seleccionarArchivo(n, f) {
+  const input = document.getElementById('file-' + n);
+  const extensiones = (input?.accept || '').split(',').filter(Boolean);
+  const nombre = f.name.toLowerCase();
+  if (extensiones.length && !extensiones.some(ext => nombre.endsWith(ext))) {
+    alert('Formato no compatible. Usa uno de estos tipos: ' + extensiones.join(', '));
+    return;
+  }
+  if (f.size > 20 * 1024 * 1024) {
+    alert('El archivo supera el máximo permitido de 20 MB.');
+    return;
+  }
   state.files[n] = f;
   document.getElementById('fn-' + n).textContent = f.name;
   document.getElementById('fz-' + n).textContent = fmtBytes(f.size);
@@ -1097,13 +1112,7 @@ function removeFile(n) {
   dz.addEventListener('drop', e => {
     e.preventDefault(); dz.classList.remove('drag');
     const f = e.dataTransfer.files[0];
-    if (f) {
-      state.files[n] = f;
-      document.getElementById('fn-' + n).textContent = f.name;
-      document.getElementById('fz-' + n).textContent = fmtBytes(f.size);
-      document.getElementById('fs-' + n).classList.add('show');
-      dz.style.opacity = '0.5';
-    }
+    if (f) seleccionarArchivo(n, f);
   });
 });
 
@@ -1238,6 +1247,7 @@ async function generarPlan() {
 
   let acumulado   = '';
   let streamando  = false;
+  let streamFileId = null;
 
   try {
     const res = await fetch(`${API_BASE}/planes/generar/stream`, {
@@ -1249,6 +1259,9 @@ async function generarPlan() {
     if (!res.ok) {
       const errTxt = await res.text();
       throw new Error(`Error ${res.status}: ${errTxt}`);
+    }
+    if (!res.body) {
+      throw new Error('El navegador no recibio el stream de respuesta.');
     }
 
     const reader  = res.body.getReader();
@@ -1269,6 +1282,7 @@ async function generarPlan() {
         try { data = JSON.parse(line.slice(6)); } catch { continue; }
 
         if (data.tipo === 'inicio') {
+          streamFileId = data.file_id || null;
           // El backend confirmó inicio — quitar spinner, mostrar cursor
           genBar.classList.remove('show');
           clearInterval(rotador);
@@ -1312,7 +1326,8 @@ async function generarPlan() {
           setPlanAccordionOpen(false);
 
         } else if (data.tipo === 'error') {
-          throw new Error(data.detalle);
+          const fase = data.fase ? ` [fase: ${data.fase}]` : '';
+          throw new Error(`${data.detalle}${fase}`);
         }
       }
     }
@@ -1320,12 +1335,19 @@ async function generarPlan() {
   } catch (err) {
     clearInterval(rotador);
     genBar.classList.remove('show');
+    const desconexion = err instanceof TypeError && err.message === 'Failed to fetch';
+    const detalle = desconexion
+      ? 'La conexion con el backend se interrumpio mientras se generaba el plan.'
+      : err.message;
+    const referencia = streamFileId
+      ? `<br><small style="opacity:0.65">Referencia para revisar logs: <code>${escapeHtml(streamFileId)}</code></small>`
+      : '';
     planOut.innerHTML = `
       <div style="color:#9B2626;padding:1.5rem;background:#FFF5F5;border-radius:10px;line-height:1.6">
         <strong>Error al generar el plan</strong><br>
-        ${err.message}<br><br>
+        ${escapeHtml(detalle)}${referencia}<br><br>
         <small style="opacity:0.65">Backend: <code>${API_BASE}</code><br>
-        Verifica que el servidor esté activo y el CORS permita este origen.</small>
+        Revisa los logs del backend para identificar la fase que fallo.</small>
       </div>`;
   }
 }

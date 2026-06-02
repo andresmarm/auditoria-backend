@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from uuid import UUID
 from typing import List
-from core.database import get_db, supabase
+from core.database import get_db, supabase_admin
 from core.security import get_current_user, require_rol
 from models.usuario import Usuario
 from models.sesion import SesionAuditoria
@@ -81,7 +81,7 @@ async def subir_documento(
     contenido = await archivo.read()
     path = f"sesiones/{sesion_id}/{tipo}/{archivo.filename}"
     try:
-        supabase.storage.from_("documentos").upload(path, contenido, {"upsert": "true"})
+        supabase_admin.storage.from_("documentos").upload(path, contenido, {"upsert": "true"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {str(e)}")
 

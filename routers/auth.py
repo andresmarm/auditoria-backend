@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from core.database import get_db, supabase_admin
+from core.database import create_supabase_auth_client, get_db, supabase_admin
 from core.security import crear_token, get_current_user, require_rol
 from models.usuario import Usuario
 from schemas.auth import RegisterSchema, LoginSchema, TokenSchema, UsuarioOut
@@ -40,7 +40,7 @@ def register(
 def login(data: LoginSchema):
     """Iniciar sesión y obtener JWT."""
     try:
-        session = supabase_admin.auth.sign_in_with_password({
+        session = create_supabase_auth_client().auth.sign_in_with_password({
             "email": data.email,
             "password": data.password
         })

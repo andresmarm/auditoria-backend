@@ -13,6 +13,10 @@ Base = declarative_base()
 supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 supabase_admin: Client = create_client(settings.supabase_url, settings.supabase_service_key)
 
+def create_supabase_auth_client() -> Client:
+    """Crea un cliente aislado para evitar que el login altere supabase_admin."""
+    return create_client(settings.supabase_url, settings.supabase_key)
+
 def get_db():
     db = SessionLocal()
     try:

@@ -200,7 +200,11 @@ Estructura exacta requerida:
   "observaciones": "Metodología y observaciones adicionales"
 }
 
-Genera entre 6 y 10 actividades concretas basadas en el procedimiento.
+Genera SOLO las actividades de auditoría necesarias y suficientes para cubrir el procedimiento real.
+NO rellenes con actividades genéricas para llegar a un número fijo.
+- Un procedimiento sencillo: 4-6 actividades.
+- Un procedimiento complejo: 7-9 actividades.
+- Dos o más procedimientos combinados: distribuye las actividades entre ellos, indica en "proceso" a cuál pertenece cada una. Máximo 10 en total.
 Usa fechas realistas comenzando 15 días desde hoy si no se especifican.
 """
 

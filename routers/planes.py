@@ -335,7 +335,9 @@ async def generar_plan_stream(
             if tipo_formato == "xlsx":
                 # Pedir a Claude el JSON estructurado para llenar el Excel
                 archivo_bytes, nombre_archivo = await _generar_xlsx(
-                    plan_completo, texto_proceso, texto_matriz, bytes_formato
+                    plan_completo, texto_proceso, texto_matriz, bytes_formato,
+                    n_docs=len(documentos_proceso),
+                    nombres_docs=", ".join(d.filename or "" for d in documentos_proceso),
                 )
                 fmt = "xlsx"
 
@@ -393,16 +395,31 @@ async def generar_plan_stream(
     )
 
 
-async def _generar_xlsx(plan_texto: str, texto_proceso: str, texto_matriz: Optional[str], bytes_formato: bytes) -> tuple[bytes, str]:
+async def _generar_xlsx(
+    plan_texto: str,
+    texto_proceso: str,
+    texto_matriz: Optional[str],
+    bytes_formato: bytes,
+    n_docs: int = 1,
+    nombres_docs: str = "",
+) -> tuple[bytes, str]:
     """Llama a Claude para obtener el JSON y llena el Excel del usuario."""
-    prompt = f"""{PROMPT_JSON_PLAN}
+    instruccion_docs = ""
+    if n_docs > 1:
+        instruccion_docs = (
+            f"\nIMPORTANTE: Este plan cubre {n_docs} procedimientos: {nombres_docs}. "
+            f"Distribuye las actividades de auditoría entre ambos procedimientos, "
+            f"indicando en el campo 'proceso' de cada actividad a cuál pertenece. "
+            f"No repitas actividades genéricas; sé específico para cada procedimiento."
+        )
+
+    prompt = f"""{PROMPT_JSON_PLAN}{instruccion_docs}
 
 Reglas adicionales:
 - Devuelve solo un objeto JSON valido.
 - No incluyas markdown.
 - No incluyas saltos de linea literales dentro de strings.
 - Usa textos concisos para evitar truncamiento.
-- Si el plan cubre multiples procedimientos, el campo "proceso" debe listarlos todos y las actividades deben cubrir cada uno.
 
 === PLAN DE AUDITORÍA GENERADO ===
 {plan_texto[:8000]}

@@ -284,10 +284,25 @@ async def generar_plan_stream(
             fase = "buscando normas relevantes"
             logger.info("Generando plan %s: %s", file_id, fase)
             chunks = buscar_chunks_relevantes(vector, top_k=8)
-            prompt_rag = construir_prompt(
-                f"Genera un plan de auditoría para el siguiente proceso:\n\n{texto_proceso[:4000]}",
-                chunks
-            )
+
+            n_docs = len(documentos_proceso)
+            if n_docs > 1:
+                lista_nombres = "\n".join(f"- {d.filename}" for d in documentos_proceso)
+                query_plan = (
+                    f"Genera un PLAN DE AUDITORÍA CONJUNTO e integrado que cubra los {n_docs} "
+                    f"procedimientos siguientes:\n{lista_nombres}\n\n"
+                    f"El plan debe ser UN SOLO documento unificado. Incluye actividades de "
+                    f"auditoría específicas para cada procedimiento, indicando claramente a cuál "
+                    f"pertenece cada actividad. El alcance, objetivo y antecedentes deben reflejar "
+                    f"todos los procedimientos auditados.\n\n"
+                    f"CONTENIDO COMPLETO DE LOS {n_docs} PROCEDIMIENTOS:\n\n{texto_proceso[:12000]}"
+                )
+            else:
+                query_plan = (
+                    f"Genera un plan de auditoría para el siguiente proceso:\n\n{texto_proceso[:12000]}"
+                )
+
+            prompt_rag = construir_prompt(query_plan, chunks)
 
             # Agregar contexto de matriz y formato si existen
             prompt_completo = prompt_rag
@@ -300,7 +315,7 @@ async def generar_plan_stream(
             logger.info("Generando plan %s: %s", file_id, fase)
             with claude_client.messages.stream(
                 model=CLAUDE_MODEL,
-                max_tokens=4096,
+                max_tokens=8192,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt_completo}]
             ) as stream:
@@ -387,12 +402,13 @@ Reglas adicionales:
 - No incluyas markdown.
 - No incluyas saltos de linea literales dentro de strings.
 - Usa textos concisos para evitar truncamiento.
+- Si el plan cubre multiples procedimientos, el campo "proceso" debe listarlos todos y las actividades deben cubrir cada uno.
 
 === PLAN DE AUDITORÍA GENERADO ===
-{plan_texto[:6000]}
+{plan_texto[:8000]}
 
-=== PROCEDIMIENTO ORIGINAL ===
-{texto_proceso[:2000]}
+=== PROCEDIMIENTOS ORIGINALES ===
+{texto_proceso[:4000]}
 """
     if texto_matriz:
         prompt += f"\n=== MATRIZ DE RIESGOS ===\n{texto_matriz[:1500]}"

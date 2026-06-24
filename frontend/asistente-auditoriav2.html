@@ -693,10 +693,10 @@
           <p class="panel-desc">Carga el documento del proceso o procedimiento que vas a auditar. Puede ser un PDF con el manual, flujograma o descripción del proceso.</p>
         </div>
         <div class="dropzone" id="dz-1">
-          <input type="file" id="file-1" accept=".pdf,.docx,.txt" onchange="onFileSelect(1, this)">
+          <input type="file" id="file-1" accept=".pdf,.docx,.txt" multiple onchange="onFileSelect(1, this)">
           <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg></div>
-          <div class="drop-title">Arrastra el documento aquí o haz clic</div>
-          <div class="drop-sub">PDF, Word o TXT · Máx 20MB</div>
+          <div class="drop-title">Arrastra los documentos aquí o haz clic</div>
+          <div class="drop-sub">PDF, Word o TXT · Hasta 5 archivos · Máx 20MB por archivo</div>
         </div>
         <div class="file-selected" id="fs-1">
           <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
@@ -1039,7 +1039,7 @@ function resetWizard() {
 
 // ── PASOS ──────────────────────────────────────────────────
 function irPaso(n) {
-  if (n === 2 && !state.files[1]) {
+  if (n === 2 && (!state.files[1] || !state.files[1].length)) {
     document.getElementById('err-1').classList.add('show');
     return;
   }
@@ -1068,9 +1068,31 @@ function fmtBytes(b) {
 }
 
 function onFileSelect(n, input) {
-  const f = input.files[0];
-  if (!f) return;
-  seleccionarArchivo(n, f);
+  if (n === 1) {
+    const files = Array.from(input.files);
+    if (!files.length) return;
+    seleccionarArchivos1(files);
+  } else {
+    const f = input.files[0];
+    if (!f) return;
+    seleccionarArchivo(n, f);
+  }
+}
+
+function seleccionarArchivos1(files) {
+  const extensiones = ['.pdf', '.docx', '.txt'];
+  const invalid = files.find(f => !extensiones.some(ext => f.name.toLowerCase().endsWith(ext)));
+  if (invalid) { alert('Formato no compatible: ' + invalid.name + '. Usa PDF, Word o TXT.'); return; }
+  const oversized = files.find(f => f.size > 20 * 1024 * 1024);
+  if (oversized) { alert('El archivo "' + oversized.name + '" supera el máximo de 20 MB.'); return; }
+  if (files.length > 5) { alert('Máximo 5 documentos de proceso permitidos.'); return; }
+  state.files[1] = files;
+  const totalBytes = files.reduce((s, f) => s + f.size, 0);
+  document.getElementById('fn-1').textContent = files.length === 1 ? files[0].name : files.length + ' documentos seleccionados';
+  document.getElementById('fz-1').textContent = fmtBytes(totalBytes);
+  document.getElementById('fs-1').classList.add('show');
+  document.getElementById('dz-1').style.opacity = '0.5';
+  document.getElementById('err-1').classList.remove('show');
 }
 
 function seleccionarArchivo(n, f) {
@@ -1111,8 +1133,13 @@ function removeFile(n) {
   dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
   dz.addEventListener('drop', e => {
     e.preventDefault(); dz.classList.remove('drag');
-    const f = e.dataTransfer.files[0];
-    if (f) seleccionarArchivo(n, f);
+    if (n === 1) {
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length) seleccionarArchivos1(files);
+    } else {
+      const f = e.dataTransfer.files[0];
+      if (f) seleccionarArchivo(n, f);
+    }
   });
 });
 
@@ -1122,9 +1149,10 @@ function actualizarResumen() {
   const sp2 = document.getElementById('sp-matriz');
   const sp3 = document.getElementById('sp-formato');
 
-  if (state.files[1]) {
+  if (state.files[1] && state.files[1].length) {
     sp1.className = 'summary-pill loaded';
-    sp1.innerHTML = iconCheck() + truncate(state.files[1].name, 28);
+    const label = state.files[1].length === 1 ? truncate(state.files[1][0].name, 28) : state.files[1].length + ' documentos';
+    sp1.innerHTML = iconCheck() + label;
   }
   if (state.files[2]) {
     sp2.className = 'summary-pill loaded';
@@ -1212,7 +1240,7 @@ function resetResultado() {
 }
 
 async function generarPlan() {
-  if (!state.files[1]) { irPaso(1); return; }
+  if (!state.files[1] || !state.files[1].length) { irPaso(1); return; }
 
   mostrar('result');
   resetResultado();
@@ -1241,7 +1269,7 @@ async function generarPlan() {
   }, 4000);
 
   const form = new FormData();
-  form.append('documento_proceso', state.files[1]);
+  (state.files[1] || []).forEach(f => form.append('documentos_proceso', f));
   if (state.files[2]) form.append('matriz_riesgos',  state.files[2]);
   if (state.files[3]) form.append('formato_salida',  state.files[3]);
 

@@ -221,9 +221,9 @@ def _crear_registro_plan(
 
 @router.post("/generar/stream")
 async def generar_plan_stream(
-    documento_proceso: UploadFile = File(...),
-    matriz_riesgos:    UploadFile = File(None),
-    formato_salida:    UploadFile = File(None),
+    documentos_proceso: List[UploadFile] = File(...),
+    matriz_riesgos:     UploadFile = File(None),
+    formato_salida:     UploadFile = File(None),
     db: Session = Depends(get_db),
     current: Usuario = Depends(get_current_user),
 ):
@@ -238,19 +238,31 @@ async def generar_plan_stream(
       {"tipo": "fin"}
       {"tipo": "error",     "detalle": "..."}
     """
-    _validar_extension(documento_proceso, "documento_proceso", {".pdf", ".docx", ".txt"})
+    if not documentos_proceso:
+        raise HTTPException(status_code=400, detail="Debe subir al menos un documento de proceso.")
+    if len(documentos_proceso) > 5:
+        raise HTTPException(status_code=400, detail="Máximo 5 documentos de proceso permitidos.")
+
+    for i, doc in enumerate(documentos_proceso):
+        _validar_extension(doc, f"documento_proceso_{i + 1}", {".pdf", ".docx", ".txt"})
     _validar_extension(matriz_riesgos, "matriz_riesgos", {".pdf", ".docx", ".xlsx", ".txt"})
     _validar_extension(formato_salida, "formato_salida", {".docx", ".xlsx"})
 
     # Leer archivos en memoria antes del streaming
-    texto_proceso  = extraer_texto(documento_proceso)
+    partes_proceso = []
+    for doc in documentos_proceso:
+        texto = extraer_texto(doc)
+        if texto.strip():
+            partes_proceso.append(f"=== {doc.filename} ===\n{texto}")
+    texto_proceso = "\n\n".join(partes_proceso)
+
     texto_matriz   = extraer_texto(matriz_riesgos)  if matriz_riesgos   else None
     texto_formato  = extraer_texto(formato_salida)  if formato_salida   else None
     bytes_formato  = formato_salida.file.read()     if formato_salida   else None
     tipo_formato   = _detectar_tipo_formato(formato_salida.filename if formato_salida else "")
 
     if not texto_proceso.strip():
-        raise HTTPException(status_code=400, detail="No se pudo extraer texto del procedimiento.")
+        raise HTTPException(status_code=400, detail="No se pudo extraer texto de ninguno de los documentos.")
 
     file_id = str(uuid.uuid4())
 
@@ -265,8 +277,9 @@ async def generar_plan_stream(
             # Buscar chunks normativos relevantes
             fase = "vectorizando consulta"
             logger.info("Generando plan %s: %s", file_id, fase)
+            nombres_docs = " ".join(d.filename or "" for d in documentos_proceso)
             vector = vectorizar_consulta(
-                f"{documento_proceso.filename or ''} {texto_proceso[:2000]}"
+                f"{nombres_docs} {texto_proceso[:2000]}"
             )
             fase = "buscando normas relevantes"
             logger.info("Generando plan %s: %s", file_id, fase)
@@ -302,6 +315,8 @@ async def generar_plan_stream(
 
             fase = "generando archivo de descarga"
             logger.info("Generando plan %s: %s", file_id, fase)
+            primer_nombre = documentos_proceso[0].filename if documentos_proceso else "auditoria"
+
             if tipo_formato == "xlsx":
                 # Pedir a Claude el JSON estructurado para llenar el Excel
                 archivo_bytes, nombre_archivo = await _generar_xlsx(
@@ -312,13 +327,13 @@ async def generar_plan_stream(
             elif tipo_formato == "docx":
                 # Word respetando la estructura del formato cargado
                 archivo_bytes = generar_word_con_formato(plan_completo, bytes_formato)
-                nombre_archivo = _nombre_archivo_seguro(f"Plan_Auditoria_{documento_proceso.filename}", "docx")
+                nombre_archivo = _nombre_archivo_seguro(f"Plan_Auditoria_{primer_nombre}", "docx")
                 fmt = "docx"
 
             else:
                 # Word estructurado estándar
-                archivo_bytes = generar_word_estandar(plan_completo, documento_proceso.filename)
-                nombre_archivo = _nombre_archivo_seguro(f"Plan_Auditoria_{documento_proceso.filename}", "docx")
+                archivo_bytes = generar_word_estandar(plan_completo, primer_nombre)
+                nombre_archivo = _nombre_archivo_seguro(f"Plan_Auditoria_{primer_nombre}", "docx")
                 fmt = "docx"
 
             # Guardar en memoria para la descarga posterior
@@ -337,7 +352,7 @@ async def generar_plan_stream(
             plan = _crear_registro_plan(
                 db=db,
                 current=current,
-                nombre_proceso=documento_proceso.filename or nombre_archivo,
+                nombre_proceso=primer_nombre or nombre_archivo,
                 plan_texto=plan_completo,
                 chunks=chunks,
                 storage_path=storage_path,

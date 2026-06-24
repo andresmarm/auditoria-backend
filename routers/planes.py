@@ -25,7 +25,7 @@ import tempfile
 import os
 import re
 import unicodedata
-from typing import Optional
+from typing import List, Optional
 from json import JSONDecodeError
 from uuid import UUID
 

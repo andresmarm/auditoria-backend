@@ -9,6 +9,7 @@ Esquema real usado:
 """
 
 import os
+from pathlib import Path
 from typing import AsyncGenerator
 from openai import OpenAI
 from anthropic import Anthropic
@@ -42,6 +43,12 @@ REGLAS:
 - Organiza la respuesta con secciones claras cuando haya múltiples aspectos
 
 Responde siempre en español."""
+
+# System prompt específico para generación de planes de auditoría (routers/planes.py).
+# Vive en prompts/plan_auditoria.txt para que se pueda ajustar sin tocar código.
+SYSTEM_PROMPT_PLAN = (
+    Path(__file__).resolve().parent.parent / "prompts" / "plan_auditoria.txt"
+).read_text(encoding="utf-8")
 
 
 # ── Paso 1: Vectorizar la pregunta ────────────────────────

@@ -25,6 +25,7 @@ import tempfile
 import os
 import re
 import unicodedata
+from datetime import date, datetime
 from typing import List, Optional
 from json import JSONDecodeError
 from uuid import UUID
@@ -44,7 +45,7 @@ from services.rag_engine import (
     construir_prompt,
     claude_client,
     CLAUDE_MODEL,
-    SYSTEM_PROMPT,
+    SYSTEM_PROMPT_PLAN,
 )
 from services.generador_word import generar_word_estandar, generar_word_con_formato
 from services.generador_excel import llenar_formato_excel, PROMPT_JSON_PLAN
@@ -147,6 +148,21 @@ def _validar_extension(archivo: UploadFile | None, campo: str, permitidas: set[s
         raise HTTPException(status_code=400, detail=f"{campo}: formato no compatible. Usa: {formatos}.")
 
 
+def _validar_rango_fechas(fecha_inicio: Optional[str], fecha_fin: Optional[str]) -> None:
+    """Valida formato YYYY-MM-DD y que fecha_fin no sea anterior a fecha_inicio."""
+    if not fecha_inicio and not fecha_fin:
+        return
+    if not fecha_inicio or not fecha_fin:
+        raise HTTPException(status_code=400, detail="Debes indicar tanto la fecha de inicio como la de fin.")
+    try:
+        inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Las fechas deben tener formato YYYY-MM-DD.")
+    if fin < inicio:
+        raise HTTPException(status_code=400, detail="La fecha de fin no puede ser anterior a la fecha de inicio.")
+
+
 def _media_type(fmt: str) -> str:
     return {
         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -224,6 +240,8 @@ async def generar_plan_stream(
     documentos_proceso: List[UploadFile] = File(...),
     matriz_riesgos:     UploadFile = File(None),
     formato_salida:     UploadFile = File(None),
+    fecha_inicio:       Optional[str] = Form(None),
+    fecha_fin:          Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current: Usuario = Depends(get_current_user),
 ):
@@ -242,6 +260,7 @@ async def generar_plan_stream(
         raise HTTPException(status_code=400, detail="Debe subir al menos un documento de proceso.")
     if len(documentos_proceso) > 5:
         raise HTTPException(status_code=400, detail="Máximo 5 documentos de proceso permitidos.")
+    _validar_rango_fechas(fecha_inicio, fecha_fin)
 
     for i, doc in enumerate(documentos_proceso):
         _validar_extension(doc, f"documento_proceso_{i + 1}", {".pdf", ".docx", ".txt"})
@@ -285,6 +304,14 @@ async def generar_plan_stream(
             logger.info("Generando plan %s: %s", file_id, fase)
             chunks = buscar_chunks_relevantes(vector, top_k=8)
 
+            instruccion_fechas = ""
+            if fecha_inicio and fecha_fin:
+                instruccion_fechas = (
+                    f"\n\nPERÍODO DE EJECUCIÓN DE LA AUDITORÍA: del {fecha_inicio} al {fecha_fin}. "
+                    f"Programa todas las actividades del plan, incluida la fase de comunicación de "
+                    f"resultados, dentro de este rango de fechas, distribuidas de forma realista."
+                )
+
             n_docs = len(documentos_proceso)
             if n_docs > 1:
                 lista_nombres = "\n".join(f"- {d.filename}" for d in documentos_proceso)
@@ -302,12 +329,14 @@ async def generar_plan_stream(
                     f"Genera un plan de auditoría para el siguiente proceso:\n\n{texto_proceso[:12000]}"
                 )
 
+            query_plan += instruccion_fechas
+
             prompt_rag = construir_prompt(query_plan, chunks)
 
             # Agregar contexto de matriz y formato si existen
             prompt_completo = prompt_rag
             if texto_matriz:
-                prompt_completo += f"\n\n=== MATRIZ DE RIESGOS ===\n{texto_matriz[:2000]}"
+                prompt_completo += f"\n\n=== MATRIZ DE RIESGOS ===\n{texto_matriz[:8000]}"
             if texto_formato:
                 prompt_completo += f"\n\n=== FORMATO INSTITUCIONAL (respetar esta estructura) ===\n{texto_formato[:1500]}"
 
@@ -316,7 +345,7 @@ async def generar_plan_stream(
             with claude_client.messages.stream(
                 model=CLAUDE_MODEL,
                 max_tokens=8192,
-                system=SYSTEM_PROMPT,
+                system=SYSTEM_PROMPT_PLAN,
                 messages=[{"role": "user", "content": prompt_completo}]
             ) as stream:
                 for token in stream.text_stream:
@@ -338,6 +367,8 @@ async def generar_plan_stream(
                     plan_completo, texto_proceso, texto_matriz, bytes_formato,
                     n_docs=len(documentos_proceso),
                     nombres_docs=", ".join(d.filename or "" for d in documentos_proceso),
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
                 )
                 fmt = "xlsx"
 
@@ -402,6 +433,8 @@ async def _generar_xlsx(
     bytes_formato: bytes,
     n_docs: int = 1,
     nombres_docs: str = "",
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
 ) -> tuple[bytes, str]:
     """Llama a Claude para obtener el JSON y llena el Excel del usuario."""
     instruccion_docs = ""
@@ -413,7 +446,16 @@ async def _generar_xlsx(
             f"No repitas actividades genéricas; sé específico para cada procedimiento."
         )
 
-    prompt = f"""{PROMPT_JSON_PLAN}{instruccion_docs}
+    instruccion_fechas = ""
+    if fecha_inicio and fecha_fin:
+        instruccion_fechas = (
+            f"\nIMPORTANTE: El período de ejecución de la auditoría es del {fecha_inicio} al "
+            f"{fecha_fin}. Usa \"fecha_inicio\": \"{fecha_inicio}\" y \"fecha_fin\": \"{fecha_fin}\" "
+            f"exactamente. Distribuye la fecha de CADA actividad (incluida la de comunicación de "
+            f"resultados) dentro de ese rango, en orden cronológico."
+        )
+
+    prompt = f"""{PROMPT_JSON_PLAN}{instruccion_docs}{instruccion_fechas}
 
 Reglas adicionales:
 - Devuelve solo un objeto JSON valido.
@@ -428,11 +470,12 @@ Reglas adicionales:
 {texto_proceso[:4000]}
 """
     if texto_matriz:
-        prompt += f"\n=== MATRIZ DE RIESGOS ===\n{texto_matriz[:1500]}"
+        prompt += f"\n=== MATRIZ DE RIESGOS ===\n{texto_matriz[:6000]}"
 
     response = claude_client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=4000,
+        system=SYSTEM_PROMPT_PLAN,
         messages=[{"role": "user", "content": prompt}]
     )
 
@@ -443,9 +486,34 @@ Reglas adicionales:
     if plan_json is None:
         raise ValueError("No se pudo convertir la respuesta de IA en un JSON valido para Excel.")
 
+    if fecha_inicio and fecha_fin:
+        _forzar_rango_fechas(plan_json, fecha_inicio, fecha_fin)
+
     excel_bytes = llenar_formato_excel(plan_json, bytes_formato)
     nombre = _nombre_archivo_seguro(f"Plan_Auditoria_{plan_json.get('proceso', 'auditoria')[:30]}", "xlsx")
     return excel_bytes, nombre
+
+
+def _forzar_rango_fechas(plan_json: dict, fecha_inicio: str, fecha_fin: str) -> None:
+    """Garantiza que las fechas del plan respeten el rango dado por el usuario,
+    sin depender de que el modelo las haya calculado bien."""
+    inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+    fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+
+    plan_json["fecha_inicio"] = fecha_inicio
+    plan_json["fecha_fin"] = fecha_fin
+
+    for act in plan_json.get("actividades", []):
+        fecha_act = act.get("fecha")
+        try:
+            fecha_parseada = datetime.strptime(fecha_act, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            act["fecha"] = fecha_inicio
+            continue
+        if fecha_parseada < inicio:
+            act["fecha"] = fecha_inicio
+        elif fecha_parseada > fin:
+            act["fecha"] = fecha_fin
 
 
 def _parsear_plan_json(raw: str) -> dict | None:

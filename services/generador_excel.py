@@ -205,7 +205,9 @@ NO rellenes con actividades genéricas para llegar a un número fijo.
 - Un procedimiento sencillo: 4-6 actividades.
 - Un procedimiento complejo: 7-9 actividades.
 - Dos o más procedimientos combinados: distribuye las actividades entre ellos, indica en "proceso" a cuál pertenece cada una. Máximo 10 en total.
-Usa fechas realistas comenzando 15 días desde hoy si no se especifican.
+- La ÚLTIMA actividad de la lista debe ser siempre la de comunicación de resultados
+  (mesa de cierre, presentación de hallazgos y acciones de mejora con el auditado).
+Usa fechas realistas comenzando 15 días desde hoy si no se especifica un período de ejecución.
 """
 
 

@@ -783,6 +783,23 @@
           <button class="file-remove" onclick="removeFile(3)"><svg viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
 
+        <!-- Período de ejecución -->
+        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px">Período de ejecución de la auditoría</div>
+          <div class="optional-badge">Opcional — si lo dejas vacío, el sistema propondrá fechas</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0">
+              <label class="form-label" for="fecha-inicio">Fecha de inicio</label>
+              <input class="form-input" type="date" id="fecha-inicio" onchange="validarRangoFechas()">
+            </div>
+            <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0">
+              <label class="form-label" for="fecha-fin">Fecha de fin</label>
+              <input class="form-input" type="date" id="fecha-fin" onchange="validarRangoFechas()">
+            </div>
+          </div>
+          <div class="error-box" id="err-fechas">La fecha de fin no puede ser anterior a la fecha de inicio.</div>
+        </div>
+
         <!-- Resumen antes de generar -->
         <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)">
           <div style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px">Resumen de la auditoría</div>
@@ -1031,6 +1048,9 @@ function nuevaAuditoria() {
 
 function resetWizard() {
   [1,2,3].forEach(n => removeFile(n));
+  document.getElementById('fecha-inicio').value = '';
+  document.getElementById('fecha-fin').value = '';
+  document.getElementById('err-fechas').classList.remove('show');
   irPaso(1);
   document.getElementById('plan-output').innerHTML = '';
   document.getElementById('fuentes-panel').style.display = 'none';
@@ -1239,8 +1259,17 @@ function resetResultado() {
   setPlanAccordionOpen(true);
 }
 
+function validarRangoFechas() {
+  const inicio = document.getElementById('fecha-inicio').value;
+  const fin    = document.getElementById('fecha-fin').value;
+  const valido = !(inicio && fin && fin < inicio);
+  document.getElementById('err-fechas').classList.toggle('show', !valido);
+  return valido;
+}
+
 async function generarPlan() {
   if (!state.files[1] || !state.files[1].length) { irPaso(1); return; }
+  if (!validarRangoFechas()) { return; }
 
   mostrar('result');
   resetResultado();
@@ -1272,6 +1301,10 @@ async function generarPlan() {
   (state.files[1] || []).forEach(f => form.append('documentos_proceso', f));
   if (state.files[2]) form.append('matriz_riesgos',  state.files[2]);
   if (state.files[3]) form.append('formato_salida',  state.files[3]);
+  const fechaInicio = document.getElementById('fecha-inicio').value;
+  const fechaFin    = document.getElementById('fecha-fin').value;
+  if (fechaInicio) form.append('fecha_inicio', fechaInicio);
+  if (fechaFin)    form.append('fecha_fin',    fechaFin);
 
   let acumulado   = '';
   let streamando  = false;

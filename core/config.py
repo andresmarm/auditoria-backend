@@ -11,7 +11,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
     environment: str = "development"
-    allowed_origins: str = "http://localhost:3000"
+    # "*" mantiene compatibles frontends estáticos o abiertos como archivo local.
+    # En producción se recomienda definir una lista explícita separada por comas.
+    allowed_origins: str = "*"
     bootstrap_admin_token: str | None = None
 
     @property
@@ -21,6 +23,11 @@ class Settings(BaseSettings):
             for origin in self.allowed_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        # Starlette no debe combinar credenciales de navegador con origen comodín.
+        return "*" not in self.allowed_origins_list
 
     class Config:
         env_file = ".env"

@@ -585,6 +585,12 @@
   .admin-message.show { display:block; }
   .admin-message.error { color:#8A2020; background:#FFF1F1; }
   .admin-message.success { color:#25623E; background:#EFFAF3; }
+  .admin-modal { position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center; padding:1rem; background:rgba(13,27,42,.62); }
+  .admin-modal.show { display:flex; }
+  .admin-modal-card { width:100%; max-width:430px; background:#fff; border-radius:var(--r-lg); padding:1.75rem; box-shadow:0 24px 70px rgba(0,0,0,.24); }
+  .admin-modal-card h3 { font-family:'DM Serif Display',serif; color:var(--navy); font-size:1.5rem; }
+  .admin-modal-card > p { color:var(--muted); font-size:13px; line-height:1.6; margin:6px 0 1.25rem; }
+  .password-requirements { color:var(--muted); font-size:11px; margin-top:6px; }
   @media (max-width: 850px) {
     .users-grid { grid-template-columns:1fr; }
     .user-row { grid-template-columns:1fr; }
@@ -1017,6 +1023,28 @@
     </div>
   </div>
 
+  <div class="admin-modal" id="password-modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
+    <form class="admin-modal-card" onsubmit="confirmarResetPassword(event)">
+      <h3 id="password-modal-title">Cambiar contraseña</h3>
+      <p id="password-modal-user">Asigna una contraseña temporal al usuario.</p>
+      <input type="hidden" id="password-modal-user-id">
+      <div class="admin-message" id="password-modal-message"></div>
+      <div class="form-group">
+        <label class="form-label" for="password-modal-value">Nueva contraseña</label>
+        <input class="form-input" id="password-modal-value" type="password" minlength="8" required autocomplete="new-password">
+        <div class="password-requirements">Mínimo 8 caracteres.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password-modal-confirm">Confirmar contraseña</label>
+        <input class="form-input" id="password-modal-confirm" type="password" minlength="8" required autocomplete="new-password">
+      </div>
+      <div class="user-form-actions">
+        <button class="btn-primary" id="password-modal-submit" type="submit">Guardar contraseña</button>
+        <button class="btn-secondary" type="button" onclick="cerrarPasswordModal()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+
 </main>
 
 <script>
@@ -1308,20 +1336,59 @@ async function cambiarEstadoUsuario(userId, activo) {
   }
 }
 
-async function resetearPasswordUsuario(userId) {
-  const password = prompt('Escribe una contraseña temporal de mínimo 8 caracteres:');
-  if (password === null) return;
+function resetearPasswordUsuario(userId) {
+  const user = usersAdmin.items.find(item => item.id === userId);
+  if (!user) return;
+  document.getElementById('password-modal-user-id').value = userId;
+  document.getElementById('password-modal-user').textContent =
+    `Nueva contraseña para ${user.nombre_completo || user.email || 'el usuario'}.`;
+  document.getElementById('password-modal-value').value = '';
+  document.getElementById('password-modal-confirm').value = '';
+  mostrarMensajeAdmin('password-modal-message');
+  document.getElementById('password-modal').classList.add('show');
+  setTimeout(() => document.getElementById('password-modal-value').focus(), 0);
+}
+
+function cerrarPasswordModal() {
+  document.getElementById('password-modal').classList.remove('show');
+  document.getElementById('password-modal-user-id').value = '';
+  document.getElementById('password-modal-value').value = '';
+  document.getElementById('password-modal-confirm').value = '';
+  mostrarMensajeAdmin('password-modal-message');
+}
+
+async function confirmarResetPassword(event) {
+  event.preventDefault();
+  const userId = document.getElementById('password-modal-user-id').value;
+  const password = document.getElementById('password-modal-value').value;
+  const confirmacion = document.getElementById('password-modal-confirm').value;
   if (password.length < 8) {
-    mostrarMensajeAdmin('users-list-message', 'La contraseña debe tener mínimo 8 caracteres.');
+    mostrarMensajeAdmin('password-modal-message', 'La contraseña debe tener mínimo 8 caracteres.');
     return;
   }
+  if (password !== confirmacion) {
+    mostrarMensajeAdmin('password-modal-message', 'Las contraseñas no coinciden.');
+    return;
+  }
+  const button = document.getElementById('password-modal-submit');
+  button.disabled = true;
+  button.textContent = 'Verificando...';
+  mostrarMensajeAdmin('password-modal-message');
   try {
-    await adminFetch(`/auth/users/${userId}/reset-password`, {
+    const resultado = await adminFetch(`/auth/users/${userId}/reset-password`, {
       method:'POST', body:JSON.stringify({ password })
     });
-    mostrarMensajeAdmin('users-list-message', 'Contraseña actualizada correctamente.', 'success');
+    cerrarPasswordModal();
+    mostrarMensajeAdmin(
+      'users-list-message',
+      resultado?.mensaje || 'Contraseña actualizada y verificada correctamente.',
+      'success'
+    );
   } catch (err) {
-    mostrarMensajeAdmin('users-list-message', err.message);
+    mostrarMensajeAdmin('password-modal-message', err.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Guardar contraseña';
   }
 }
 

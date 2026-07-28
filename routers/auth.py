@@ -182,7 +182,7 @@ def cambiar_estado_usuario(
     return _usuario_out(usuario, _email_de_usuario(usuario.id))
 
 
-@router.post("/users/{usuario_id}/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/users/{usuario_id}/reset-password")
 def resetear_password(
     usuario_id: UUID,
     data: PasswordResetSchema,
@@ -191,9 +191,23 @@ def resetear_password(
 ):
     usuario = _obtener_usuario(usuario_id, db)
     try:
-        supabase_admin.auth.admin.update_user_by_id(
+        respuesta = supabase_admin.auth.admin.update_user_by_id(
             str(usuario.id), {"password": data.password}
         )
+        email = respuesta.user.email if respuesta and respuesta.user else None
+        if not email:
+            raise RuntimeError("Supabase no devolvió el correo del usuario actualizado")
+
+        # Verificación real: el endpoint solo confirma éxito si la nueva clave autentica.
+        verificacion = create_supabase_auth_client().auth.sign_in_with_password({
+            "email": email,
+            "password": data.password,
+        })
+        if not verificacion.user or str(verificacion.user.id) != str(usuario.id):
+            raise RuntimeError("Supabase no confirmó la nueva contraseña")
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"No se pudo actualizar la contraseña: {str(exc)}")
-    return None
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo verificar el cambio de contraseña: {str(exc)}",
+        )
+    return {"mensaje": "Contraseña actualizada y verificada", "usuario_id": str(usuario.id)}

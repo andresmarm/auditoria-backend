@@ -35,7 +35,7 @@ from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
 
 from core.database import get_db, supabase_admin
-from core.security import get_current_user
+from core.security import get_current_user, require_rol
 from models.usuario import Usuario
 from models.sesion import SesionAuditoria
 from models.plan import PlanAuditoria
@@ -243,7 +243,7 @@ async def generar_plan_stream(
     fecha_inicio:       Optional[str] = Form(None),
     fecha_fin:          Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current: Usuario = Depends(get_current_user),
+    current: Usuario = Depends(require_rol("admin", "auditor")),
 ):
     """
     Genera el plan de auditoría en streaming SSE.
@@ -388,7 +388,8 @@ async def generar_plan_stream(
             _archivos_temp[file_id] = {
                 "bytes":  archivo_bytes,
                 "nombre": nombre_archivo,
-                "fmt":    fmt
+                "fmt":    fmt,
+                "usuario_id": str(current.id),
             }
 
             storage_path = f"{current.id}/{file_id}/{nombre_archivo}"
@@ -668,12 +669,17 @@ async def descargar_plan_persistido(
 
 
 @router.get("/descargar/{file_id}")
-async def descargar_plan(file_id: str):
+async def descargar_plan(
+    file_id: str,
+    current: Usuario = Depends(require_rol("admin", "auditor")),
+):
     """Descarga el archivo generado por su ID temporal."""
     if file_id not in _archivos_temp:
         raise HTTPException(status_code=404, detail="Archivo no encontrado o expirado.")
 
     info = _archivos_temp[file_id]
+    if info.get("usuario_id") != str(current.id):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado o expirado.")
     fmt  = info["fmt"]
 
     media_types = {

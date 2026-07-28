@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.openapi.utils import get_openapi
+from core.config import settings
 from routers import auth, sesiones, planes, normas, asistente
 
 app = FastAPI(
@@ -12,7 +13,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,9 +52,11 @@ def custom_openapi():
             "scheme": "bearer",
         }
     }
-    for path in schema["paths"].values():
+    public_paths = {"/", "/health", "/debug/rutas", "/api/v1/auth/login", "/api/v1/auth/bootstrap-admin"}
+    for route_path, path in schema["paths"].items():
         for method in path.values():
-            method["security"] = [{"HTTPBearer": []}]
+            if route_path not in public_paths:
+                method["security"] = [{"HTTPBearer": []}]
     app.openapi_schema = schema
     return schema
 

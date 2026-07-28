@@ -556,6 +556,40 @@
     border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
     border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
   }
+
+  /* ── ADMINISTRACIÓN DE USUARIOS ── */
+  #screen-users { width: 100%; max-width: 1050px; display: none; flex-direction: column; gap: 1.25rem; }
+  .users-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+  .users-header h2 { font-family:'DM Serif Display',serif; font-size:2rem; color:var(--navy); }
+  .users-header p { color:var(--muted); font-size:14px; margin-top:5px; }
+  .users-grid { display:grid; grid-template-columns:340px 1fr; gap:20px; align-items:start; }
+  .user-admin-card { background:#fff; border:1px solid var(--border); border-radius:var(--r-lg); padding:1.5rem; }
+  .user-admin-card h3 { font-size:16px; color:var(--navy); margin-bottom:4px; }
+  .user-admin-card .card-help { color:var(--muted); font-size:12px; line-height:1.5; margin-bottom:1.25rem; }
+  .user-form-actions { display:flex; gap:8px; margin-top:1rem; }
+  .user-form-actions button { flex:1; justify-content:center; }
+  .users-list { display:flex; flex-direction:column; gap:10px; }
+  .user-row { background:#fff; border:1px solid var(--border); border-radius:var(--r); padding:1rem; display:grid; grid-template-columns:minmax(180px,1.4fr) minmax(130px,.8fr) auto; gap:14px; align-items:center; }
+  .user-row.inactive { opacity:.62; }
+  .user-row-name { font-size:14px; font-weight:600; color:var(--navy); }
+  .user-row-email,.user-row-meta { font-size:12px; color:var(--muted); margin-top:3px; }
+  .role-badge { display:inline-flex; border-radius:20px; padding:4px 9px; background:var(--cream); color:var(--navy2); font-size:11px; font-weight:600; text-transform:capitalize; }
+  .role-badge.admin { background:#FFF3D8; color:#805A0D; }
+  .status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#3A8D5D; margin-right:5px; }
+  .status-dot.off { background:#9B2626; }
+  .user-row-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .btn-mini { border:1px solid var(--border); background:#fff; color:var(--navy); border-radius:7px; padding:7px 9px; font:500 11px 'Sora',sans-serif; cursor:pointer; }
+  .btn-mini:hover { border-color:var(--gold); }
+  .btn-mini.danger { color:#9B2626; }
+  .admin-message { display:none; border-radius:8px; padding:10px 12px; font-size:12px; margin-bottom:12px; line-height:1.5; }
+  .admin-message.show { display:block; }
+  .admin-message.error { color:#8A2020; background:#FFF1F1; }
+  .admin-message.success { color:#25623E; background:#EFFAF3; }
+  @media (max-width: 850px) {
+    .users-grid { grid-template-columns:1fr; }
+    .user-row { grid-template-columns:1fr; }
+    .user-row-actions { justify-content:flex-start; }
+  }
   .header-user {
     display: none; align-items: center; gap: 10px;
   }
@@ -640,6 +674,10 @@
       <button class="btn-secondary" onclick="mostrarPlanesGenerados()">
         <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
         Ver planes generados
+      </button>
+      <button class="btn-secondary" id="btn-admin-users" onclick="mostrarUsuarios()" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm10 10v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        Usuarios
       </button>
     </div>
     <div class="home-features">
@@ -919,6 +957,66 @@
     <div class="plans-list" id="plans-list"></div>
   </div>
 
+  <!-- ── PANTALLA ADMINISTRACIÓN DE USUARIOS ── -->
+  <div id="screen-users">
+    <div class="users-header">
+      <div>
+        <h2>Usuarios</h2>
+        <p>Crea funcionarios, asigna roles y controla su acceso al sistema.</p>
+      </div>
+      <button class="btn-action" onclick="volverHome()">
+        <svg viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        Volver
+      </button>
+    </div>
+    <div class="users-grid">
+      <form class="user-admin-card" id="user-admin-form" onsubmit="guardarUsuario(event)">
+        <h3 id="user-form-title">Nuevo usuario</h3>
+        <p class="card-help" id="user-form-help">La cuenta quedará confirmada y podrá iniciar sesión inmediatamente.</p>
+        <div class="admin-message" id="user-form-message"></div>
+        <input type="hidden" id="admin-user-id">
+        <div class="form-group">
+          <label class="form-label" for="admin-user-name">Nombre completo</label>
+          <input class="form-input" id="admin-user-name" required maxlength="150">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-user-email">Correo electrónico</label>
+          <input class="form-input" id="admin-user-email" type="email" required autocomplete="off">
+        </div>
+        <div class="form-group" id="admin-password-group">
+          <label class="form-label" for="admin-user-password">Contraseña temporal</label>
+          <input class="form-input" id="admin-user-password" type="password" minlength="8" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-user-role">Rol</label>
+          <select class="form-input" id="admin-user-role">
+            <option value="auditor">Auditor</option>
+            <option value="consultor">Consultor</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-user-position">Cargo</label>
+          <input class="form-input" id="admin-user-position" maxlength="150">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-user-area">Dependencia</label>
+          <input class="form-input" id="admin-user-area" maxlength="150">
+        </div>
+        <div class="user-form-actions">
+          <button class="btn-primary" id="admin-user-submit" type="submit">Crear usuario</button>
+          <button class="btn-secondary" id="admin-user-cancel" type="button" onclick="limpiarFormularioUsuario()" style="display:none">Cancelar</button>
+        </div>
+      </form>
+      <div>
+        <div class="admin-message" id="users-list-message"></div>
+        <div class="users-list" id="users-list">
+          <div class="plans-empty">Cargando usuarios...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -1006,15 +1104,22 @@ function mostrarUsuarioEnHeader() {
   const nm = document.getElementById('user-name-label');
   el.classList.add('show');
   if (auth.user) nm.textContent = auth.user.nombre_completo || auth.user.email || '';
+  const adminBtn = document.getElementById('btn-admin-users');
+  if (adminBtn) adminBtn.style.display = auth.user?.rol === 'admin' ? 'inline-flex' : 'none';
 }
 
-// Arrancar: si hay token guardado ir al home, si no al login
-window.addEventListener('DOMContentLoaded', () => {
-  if (auth.token) {
+// Arrancar validando el token guardado contra el backend.
+window.addEventListener('DOMContentLoaded', async () => {
+  if (!auth.token) { mostrar('login'); return; }
+  try {
+    const res = await fetch(`${API_BASE}/auth/me`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Sesión expirada');
+    auth.user = await res.json();
+    localStorage.setItem('jwt_user', JSON.stringify(auth.user));
     mostrarUsuarioEnHeader();
     mostrar('home');
-  } else {
-    mostrar('login');
+  } catch {
+    logout();
   }
 });
 
@@ -1023,7 +1128,7 @@ const state = { files: { 1: null, 2: null, 3: null }, pasoActual: 1 };
 
 // ── NAVEGACIÓN ─────────────────────────────────────────────
 function mostrar(id) {
-  ['login','home','wizard','result','plans'].forEach(s => {
+  ['login','home','wizard','result','plans','users'].forEach(s => {
     const el = document.getElementById('screen-' + s);
     if (el) el.style.display = 'none';
   });
@@ -1058,6 +1163,168 @@ function resetWizard() {
 }
 
 // ── PASOS ──────────────────────────────────────────────────
+// ── ADMINISTRACIÓN DE USUARIOS ──
+const usersAdmin = { items: [] };
+
+function mostrarMensajeAdmin(id, texto = '', tipo = 'error') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = texto;
+  el.className = `admin-message${texto ? ` show ${tipo}` : ''}`;
+}
+
+async function adminFetch(path, options = {}) {
+  const headers = { ...getAuthHeaders(), ...(options.headers || {}) };
+  if (options.body) headers['Content-Type'] = 'application/json';
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (res.status === 401) {
+    logout();
+    throw new Error('La sesión expiró. Inicia sesión nuevamente.');
+  }
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.detail || `Error ${res.status}`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+function mostrarUsuarios() {
+  if (auth.user?.rol !== 'admin') return;
+  mostrar('users');
+  limpiarFormularioUsuario();
+  cargarUsuarios();
+}
+
+async function cargarUsuarios() {
+  const list = document.getElementById('users-list');
+  list.innerHTML = '<div class="plans-empty">Cargando usuarios...</div>';
+  mostrarMensajeAdmin('users-list-message');
+  try {
+    usersAdmin.items = await adminFetch('/auth/users');
+    renderUsuarios();
+  } catch (err) {
+    list.innerHTML = '';
+    mostrarMensajeAdmin('users-list-message', err.message);
+  }
+}
+
+function renderUsuarios() {
+  const list = document.getElementById('users-list');
+  if (!usersAdmin.items.length) {
+    list.innerHTML = '<div class="plans-empty">No hay usuarios registrados.</div>';
+    return;
+  }
+  list.innerHTML = usersAdmin.items.map(user => `
+    <div class="user-row ${user.activo ? '' : 'inactive'}">
+      <div>
+        <div class="user-row-name">${escapeHtml(user.nombre_completo || 'Sin nombre')}</div>
+        <div class="user-row-email">${escapeHtml(user.email || 'Correo no disponible')}</div>
+        <div class="user-row-meta">${escapeHtml(user.cargo || 'Sin cargo')} · ${escapeHtml(user.dependencia || 'Sin dependencia')}</div>
+      </div>
+      <div>
+        <span class="role-badge ${escapeHtml(user.rol)}">${escapeHtml(user.rol)}</span>
+        <div class="user-row-meta"><span class="status-dot ${user.activo ? '' : 'off'}"></span>${user.activo ? 'Activo' : 'Inactivo'}</div>
+      </div>
+      <div class="user-row-actions">
+        <button class="btn-mini" onclick="editarUsuario('${user.id}')">Editar</button>
+        <button class="btn-mini" onclick="resetearPasswordUsuario('${user.id}')">Contraseña</button>
+        <button class="btn-mini ${user.activo ? 'danger' : ''}" onclick="cambiarEstadoUsuario('${user.id}', ${!user.activo})">${user.activo ? 'Desactivar' : 'Activar'}</button>
+      </div>
+    </div>`).join('');
+}
+
+function limpiarFormularioUsuario() {
+  document.getElementById('user-admin-form').reset();
+  document.getElementById('admin-user-id').value = '';
+  document.getElementById('admin-user-email').disabled = false;
+  document.getElementById('admin-user-password').required = true;
+  document.getElementById('admin-password-group').style.display = 'block';
+  document.getElementById('user-form-title').textContent = 'Nuevo usuario';
+  document.getElementById('user-form-help').textContent = 'La cuenta quedará confirmada y podrá iniciar sesión inmediatamente.';
+  document.getElementById('admin-user-submit').textContent = 'Crear usuario';
+  document.getElementById('admin-user-cancel').style.display = 'none';
+  mostrarMensajeAdmin('user-form-message');
+}
+
+function editarUsuario(userId) {
+  const user = usersAdmin.items.find(item => item.id === userId);
+  if (!user) return;
+  document.getElementById('admin-user-id').value = user.id;
+  document.getElementById('admin-user-name').value = user.nombre_completo || '';
+  document.getElementById('admin-user-email').value = user.email || '';
+  document.getElementById('admin-user-email').disabled = true;
+  document.getElementById('admin-user-role').value = user.rol;
+  document.getElementById('admin-user-position').value = user.cargo || '';
+  document.getElementById('admin-user-area').value = user.dependencia || '';
+  document.getElementById('admin-user-password').required = false;
+  document.getElementById('admin-password-group').style.display = 'none';
+  document.getElementById('user-form-title').textContent = 'Editar usuario';
+  document.getElementById('user-form-help').textContent = 'Actualiza el perfil y los permisos asignados.';
+  document.getElementById('admin-user-submit').textContent = 'Guardar cambios';
+  document.getElementById('admin-user-cancel').style.display = 'inline-flex';
+  mostrarMensajeAdmin('user-form-message');
+}
+
+async function guardarUsuario(event) {
+  event.preventDefault();
+  const userId = document.getElementById('admin-user-id').value;
+  const payload = {
+    nombre_completo: document.getElementById('admin-user-name').value.trim(),
+    cargo: document.getElementById('admin-user-position').value.trim() || null,
+    dependencia: document.getElementById('admin-user-area').value.trim() || null,
+    rol: document.getElementById('admin-user-role').value
+  };
+  if (!userId) {
+    payload.email = document.getElementById('admin-user-email').value.trim();
+    payload.password = document.getElementById('admin-user-password').value;
+  }
+  const button = document.getElementById('admin-user-submit');
+  button.disabled = true;
+  mostrarMensajeAdmin('user-form-message');
+  try {
+    await adminFetch(userId ? `/auth/users/${userId}` : '/auth/register', {
+      method: userId ? 'PATCH' : 'POST', body: JSON.stringify(payload)
+    });
+    limpiarFormularioUsuario();
+    await cargarUsuarios();
+    mostrarMensajeAdmin('users-list-message', userId ? 'Usuario actualizado.' : 'Usuario creado correctamente.', 'success');
+  } catch (err) {
+    mostrarMensajeAdmin('user-form-message', err.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function cambiarEstadoUsuario(userId, activo) {
+  const accion = activo ? 'activar' : 'desactivar';
+  if (!confirm(`¿Deseas ${accion} este usuario?`)) return;
+  try {
+    await adminFetch(`/auth/users/${userId}/estado`, {
+      method:'PATCH', body:JSON.stringify({ activo })
+    });
+    await cargarUsuarios();
+  } catch (err) {
+    mostrarMensajeAdmin('users-list-message', err.message);
+  }
+}
+
+async function resetearPasswordUsuario(userId) {
+  const password = prompt('Escribe una contraseña temporal de mínimo 8 caracteres:');
+  if (password === null) return;
+  if (password.length < 8) {
+    mostrarMensajeAdmin('users-list-message', 'La contraseña debe tener mínimo 8 caracteres.');
+    return;
+  }
+  try {
+    await adminFetch(`/auth/users/${userId}/reset-password`, {
+      method:'POST', body:JSON.stringify({ password })
+    });
+    mostrarMensajeAdmin('users-list-message', 'Contraseña actualizada correctamente.', 'success');
+  } catch (err) {
+    mostrarMensajeAdmin('users-list-message', err.message);
+  }
+}
+
 function irPaso(n) {
   if (n === 2 && (!state.files[1] || !state.files[1].length)) {
     document.getElementById('err-1').classList.add('show');

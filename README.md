@@ -73,3 +73,16 @@ Una vez corriendo, visita:
 | POST | `/api/v1/planes/guardar` | Guardar plan generado |
 | GET  | `/api/v1/planes/{id}/descargar` | Descargar DOCX/PDF |
 | POST | `/api/v1/normas` | Cargar norma al sistema (admin) |
+
+### Administracion de usuarios
+
+Los administradores disponen de endpoints para listar y crear usuarios, editar
+sus perfiles y roles, activar o desactivar cuentas y restablecer contrasenas:
+`GET /api/v1/auth/users`, `POST /api/v1/auth/register`,
+`PATCH /api/v1/auth/users/{id}`, `PATCH /api/v1/auth/users/{id}/estado` y
+`POST /api/v1/auth/users/{id}/reset-password`.
+
+Para crear el primer administrador cuando la tabla `usuarios` esta vacia,
+configura temporalmente `BOOTSTRAP_ADMIN_TOKEN` y llama
+`POST /api/v1/auth/bootstrap-admin` con el mismo secreto en la cabecera
+`X-Bootstrap-Token`. Retira la variable del despliegue despues de utilizarla.

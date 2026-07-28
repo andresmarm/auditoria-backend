@@ -12,6 +12,15 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 480
     environment: str = "development"
     allowed_origins: str = "http://localhost:3000"
+    bootstrap_admin_token: str | None = None
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.allowed_origins.split(",")
+            if origin.strip()
+        ]
 
     class Config:
         env_file = ".env"
